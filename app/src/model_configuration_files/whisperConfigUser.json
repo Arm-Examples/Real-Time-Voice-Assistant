@@ -1,0 +1,12 @@
+{
+    "printRealtime": true,
+    "printProgress": false,
+    "printTimeStamps": true,
+    "printSpecial": false,
+    "translate": false,
+    "language": "en",
+    "numThreads": 5,
+    "offsetMs": 0,
+    "noContext": true,
+    "singleSegment": false
+  }

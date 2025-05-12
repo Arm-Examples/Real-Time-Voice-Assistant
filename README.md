@@ -17,6 +17,7 @@
     * [Text to Speech Component](#text-to-speech-component)
   * [KleidiAI Configuration](#kleidiai-configuration)
   * [Custom LLM Configuration](#custom-llm-configuration)
+  * [Custom STT Configuration](#custom-stt-configuration)
   * [Resources](#resources)
   * [Tested Devices](#tested-devices)
   * [Supported ABIs](#supported-abis)
@@ -119,6 +120,22 @@ In addition to the default settings, this application allows you to provide cust
 * `numThreads`: An integer that specifies the number of threads the LLM should use.
 
 You only need to modify the values associated with these keys if you wish to customize the LLM's behavior. Do not remove any of the keys, as they are mandatory for the configuration to work properly.
+
+## Custom STT Configuration
+
+In addition to the default settings, this application allows you to provide custom configuration parameters for the STT via a JSON-formatted file named `app/src/model_configuration_files/whisperConfig.json`. This file must contain the following mandatory keys:
+* `printRealtime`: Show live partial results on the console.
+* `printProgress`: Display a progress bar while decoding.
+* `printTimeStamps`: Add timecodes in front of each segment.
+* `printSpecial`: Print special tokens such as <|nospeech|>.
+* `translate`: Translate everything into English instead of transcribing.
+* `language`: ISO code of the spoken language, or "auto" for detection.
+* `numThreads`: Number of CPU threads Whisper may use.
+* `offsetMs`: Skip this many milliseconds at the start of the audio.
+* `noContext`: Don’t feed previous text back as context.
+* `singleSegment`: Stop after the first (≈30 s) segment.
+
+You only need to modify the values associated with these keys if you wish to customize the STT's behavior. Do not remove any of the keys, as they are mandatory for the configuration to work properly.
 
 ## Resources
 

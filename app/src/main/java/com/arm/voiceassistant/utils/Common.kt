@@ -10,6 +10,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import com.arm.llm.LlamaConfig
+import com.arm.stt.WhisperConfig
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import kotlin.concurrent.Volatile
 import java.io.File
@@ -110,6 +111,89 @@ object Utils {
         val modelPointer = "$modelPath/$llmModelName"
 
         return LlamaConfig(modelTag, stopWords, modelPointer, llmPrefix, numThreads)
+    }
+
+    /**
+     * Check if config file is valid
+     */
+    fun isValidWhisperConfig(file: File): Boolean {
+        return try {
+            // Read file contents
+            val content = file.readText()
+            if (content.isBlank()) return false
+            // Parse into JSON
+            val jsonObject = JSONObject(content)
+            // Example checks: ensure required keys are present and valid.
+            // Adjust these checks depending on which fields you consider "required".
+            jsonObject.has("printRealtime") &&
+                    jsonObject.has("printProgress") &&
+                    jsonObject.has("printTimeStamps") &&
+                    jsonObject.has("printSpecial") &&
+                    jsonObject.has("translate") &&
+                    jsonObject.has("language") &&
+                    jsonObject.has("numThreads") &&
+                    jsonObject.has("offsetMs") &&
+                    jsonObject.has("noContext") &&
+                    jsonObject.has("singleSegment") &&
+                    // Check that the language field is not empty
+                    jsonObject.getString("language").isNotEmpty() &&
+                    // Validate number of threads
+                    (jsonObject.getInt("numThreads") > 0) &&
+                    (jsonObject.getInt("numThreads") <= Runtime.getRuntime().availableProcessors())
+        } catch (e: Exception) {
+            // Log or handle the exception as you see fit
+            Log.e(VOICE_ASSISTANT_TAG, "Invalid configuration file: missing or invalid configuration values.", e)
+            false
+        }
+    }
+     /**
+      * Reads a JSON file containing Whisper configuration and returns a WhisperConfig object.
+      */
+    fun readWhisperUserConfig(file: File): WhisperConfig {
+        // Read the file content
+        val content = file.readText()
+        val jsonObject = JSONObject(content)
+        // Extract each field from the JSON, with sensible defaults if missing
+        val printRealtime   = jsonObject.optBoolean("printRealtime",   true)
+        val printProgress   = jsonObject.optBoolean("printProgress",   false)
+        val printTimeStamps = jsonObject.optBoolean("printTimeStamps", true)
+        val printSpecial    = jsonObject.optBoolean("printSpecial",    false)
+        val translate       = jsonObject.optBoolean("translate",       false)
+        val language        = jsonObject.optString("language",         "en")
+        val numThreads      = jsonObject.optInt("numThreads",          4)
+        val offsetMs        = jsonObject.optInt("offsetMs",            0)
+        val noContext       = jsonObject.optBoolean("noContext",       true)
+        val singleSegment   = jsonObject.optBoolean("singleSegment",   false)
+        return WhisperConfig(
+            printRealtime,
+            printProgress,
+            printTimeStamps,
+            printSpecial,
+            translate,
+            language,
+            numThreads,
+            offsetMs,
+            noContext,
+            singleSegment
+        )
+    }
+    /**
+     * Create default configurations for whisper
+     */
+    fun createWhisperDefaultConfig() : WhisperConfig
+    {
+        val printRealtime = true;
+        val printProgress = false;
+        val printTimeStamps = true
+        val printSpecial = false;
+        val translate = false;
+        val language = "en";
+        val numThreads = 4;
+        val offsetMs = 0;
+        val noContext = true;
+        val singleSegment = false;
+        return WhisperConfig(printRealtime, printProgress, printTimeStamps, printSpecial, translate,
+            language, numThreads, offsetMs, noContext, singleSegment)
     }
 
     /**

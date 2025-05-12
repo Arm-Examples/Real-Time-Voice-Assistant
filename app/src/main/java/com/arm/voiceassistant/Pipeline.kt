@@ -9,6 +9,7 @@ package com.arm.voiceassistant
 import android.util.Log
 import com.arm.llm.Llama
 import com.arm.stt.Whisper
+import com.arm.stt.WhisperConfig
 import com.arm.voiceassistant.audio.AudioReader
 import com.arm.voiceassistant.speech.SpeechRecorder
 import com.arm.voiceassistant.speech.SpeechSynthesis
@@ -17,8 +18,11 @@ import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.createDefaultConfig
+import com.arm.voiceassistant.utils.Utils.createWhisperDefaultConfig
 import com.arm.voiceassistant.utils.Utils.isValidConfig
 import com.arm.voiceassistant.utils.Utils.readUserConfig
+import com.arm.voiceassistant.utils.Utils.readWhisperUserConfig
+import com.arm.voiceassistant.utils.Utils.isValidWhisperConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -55,6 +59,9 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
     // User config file name
     private var configFileName = "llamaConfigUser.json"
 
+    // User config file name stt
+    private var configFileNameSTT = "whisperConfigUser.json"
+
     /**
      * Initialize speech recognition, large language model and speech synthesis
      */
@@ -62,6 +69,19 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
         if (!isTest) {
             try {
                 sttContext = stt.initContext("$modelPath/${Constants.STT_MODEL_NAME}")
+
+                val configFileWhisper = File("$modelPath/$configFileNameSTT")
+                var whisperParams = WhisperConfig()
+                if (configFileWhisper.exists()) {
+                    if (isValidWhisperConfig(configFileWhisper)) {
+                        whisperParams = readWhisperUserConfig(configFileWhisper)
+                    }
+                }
+                else{
+                    whisperParams = createWhisperDefaultConfig()
+                }
+                // Initialize stt parameters
+                stt.initParameters(whisperParams);
 
                 // User llm config file
                 val configFile = File("$modelPath/$configFileName")
@@ -151,10 +171,9 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
         timers.toggleSpeechRecTimer(true)
         val audioInputStream = FileInputStream(audioFile)
         val audioArray: FloatArray = reader.readWavData(audioInputStream)
-        val numThreads = 4
         var transcribed: String
         withContext(Dispatchers.Default) {
-            transcribed = stt.fullTranscribe(sttContext, numThreads, audioArray)
+            transcribed = stt.fullTranscribe(sttContext, audioArray)
         }
         val sanitizedTranscribed = Utils.removeTags(transcribed)
         timers.toggleSpeechRecTimer(false)
