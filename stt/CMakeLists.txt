@@ -13,7 +13,7 @@ project(stt-module
 include(FetchContent)
 
 set(STT_MODULE_GIT_URL "https://gitlab.arm.com/kleidi/kleidi-examples/speech-to-text")
-set(STT_MODULE_GIT_SHA "main")
+set(STT_MODULE_GIT_SHA "ee8f4da7")
 set(STT_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/stt-src")
 
 if(${ANDROID_ABI} STREQUAL "arm64-v8a")

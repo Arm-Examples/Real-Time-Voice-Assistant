@@ -13,7 +13,7 @@ project(llm-module
 include(FetchContent)
 
 set(LLM_MODULE_GIT_URL "https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models")
-set(LLM_MODULE_GIT_SHA "main")
+set(LLM_MODULE_GIT_SHA "832713b5")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
 
 if(${ANDROID_ABI} STREQUAL "arm64-v8a")
