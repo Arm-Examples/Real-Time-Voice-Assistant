@@ -11,188 +11,224 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.arm.voiceassistant.ui.composables.ActionButton
-import com.arm.voiceassistant.ui.composables.ConfirmationDialog
-import com.arm.voiceassistant.ui.composables.ConversationText
-import com.arm.voiceassistant.ui.composables.ErrorSnackbar
-import com.arm.voiceassistant.ui.composables.ModelMetrics
-import com.arm.voiceassistant.ui.composables.userTextFieldDefaults
-import com.arm.voiceassistant.ui.composables.voiceAssistantTextFieldDefaults
-import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
+import androidx.compose.ui.unit.sp
+import com.arm.voiceassistant.ui.composables.*
+import com.arm.voiceassistant.utils.ChatMessage
 import com.arm.voiceassistant.utils.Constants
-import com.arm.voiceassistant.viewmodels.MainUiState
+import com.arm.voiceassistant.viewmodels.MainViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 
-// Definition of the main application screen
+/**
+ * Message item composable.
+ * @param label of the message
+ * @param isUser true if user, false otherwise
+ * @param bubble UI composable used for this message item
+ */
+@Composable
+private fun MessageItem(
+    label: String,
+    isUser: Boolean,
+    bubble: @Composable () -> Unit
+) {
+    val align = if (isUser) Alignment.End else Alignment.Start
+    val labelMod = if (isUser) Modifier.padding(end = 12.dp, bottom = 4.dp)
+    else Modifier.padding(start = 12.dp, bottom = 4.dp)
 
+    Column(horizontalAlignment = align) {
+        Text(
+            text = label,
+            fontSize = 16.sp,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = labelMod
+        )
+        bubble()
+    }
+}
+/**
+ * Main UI screen for the Voice Assistant app.
+ * @param modifier modifier for padding and background of Main UI screen
+ * @param viewModel The shared [MainViewModel] managing app state and actions
+ * @param snackbarHostState Snackbar state for showing errors or alerts
+ * @param recordingPermissionState Permission state for microphone access
+ */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier,
+    viewModel: MainViewModel,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
-    state: MainUiState = MainUiState(),
-    onClickStartRecording: () -> Unit = {},
-    onClickStopRecording: () -> Unit = {},
-    onClickCancelRecording: () -> Unit = {},
-    onClickCancel: () -> Unit = {},
-    onError: (String) -> Unit = {},
-    clearErrorMsg: () -> Unit = {},
-    recordingPermissionState: PermissionState =
-        rememberPermissionState(Manifest.permission.RECORD_AUDIO)
+    recordingPermissionState: PermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
 ) {
+    // Collect state
+    val uiState by viewModel.uiState.collectAsState()
+    val messages = viewModel.messages
+
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(uiState.responseText, messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.scrollToItem(messages.lastIndex)
+        }
+    }
+
+    LaunchedEffect(messages.size) {
+        if (messages.isEmpty()) {
+            messages.add(ChatMessage.AssistantText("Hi!\nI'm your AI assistant. How can I help you?"))
+        }
+    }
+
     var openConfirmationDialog by remember { mutableStateOf(false) }
 
-    // Display error
-    if (state.error.state) {
+    // Error Snackbar
+    if (uiState.error.state) {
         ErrorSnackbar(
             snackbarHostState = snackbarHostState,
-            message = state.error.message,
-            onDismiss = clearErrorMsg
+            message = uiState.error.message,
+            onDismiss = { viewModel.clearError() }
         )
     }
 
-    // Display confirmation dialog for cancelling recording
+    // Cancel recording confirmation
     if (openConfirmationDialog) {
         ConfirmationDialog(
             onDismissRequest = { openConfirmationDialog = false },
             onConfirmation = {
-                onClickCancelRecording()
+                viewModel.cancelRecording()
                 openConfirmationDialog = false
             },
             dialogText = "Cancel the current recording?"
         )
     }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            wasGranted ->
-        if (wasGranted) onClickStartRecording()
-        else onError("Need to grant permission to record!")
+    // Permission launcher
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) viewModel.onStartRecording()
+        else viewModel.onError("Need to grant permission to record!")
+    }
+
+    // Themed background
+    val backgroundModifier = if (isSystemInDarkTheme()) {
+        Modifier.background(color = MaterialTheme.colorScheme.primary)
+    } else {
+        Modifier.background(
+            brush = Brush.verticalGradient(
+                listOf(
+                    MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.inversePrimary
+                )
+            )
+        )
     }
 
     Column(
-        modifier = modifier
-            .background(color = MaterialTheme.colorScheme.primary)
+        modifier = backgroundModifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .padding(top = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
-        if (state.displayPerformance) {
-            ModelMetrics(
-                model1metric = state.sttTime,
-                model2metric = state.llmEncodeTPS,
-                model3metric = state.llmDecodeTPS
-            )
-        }
-
-        val backgroundModifier =
-            if (isSystemInDarkTheme()) {
-                Modifier.background(color = MaterialTheme.colorScheme.primary)
-            } else {
-                Modifier.background(brush = Brush.verticalGradient(listOf(
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.inversePrimary)))
+        if (uiState.displayPerformance) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 6.dp)
+                    .height(IntrinsicSize.Min)
+            ) {
+                ModelMetrics(
+                    model1metric = uiState.sttTime,
+                    model2metric = uiState.llmEncodeTPS,
+                    model3metric = uiState.llmDecodeTPS
+                )
             }
 
-        Column(
-            modifier = backgroundModifier
-                .padding(start = 10.dp, end = 10.dp)
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // Chat history
+        if (messages.size == 1 && messages.first() is ChatMessage.AssistantText) {
             Column(
                 modifier = Modifier
-                    // Fill remaining space
                     .weight(1f)
-                    .padding(start = 5.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
-                verticalArrangement = Arrangement.Center
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.Start
             ) {
-                // Reduce aspect ratio if displaying performance metrics
-                val cardAspectRatio = if (state.displayPerformance) 1.35f else 1.1f
-
-                ConversationText(
-                    cardAspectRatio = cardAspectRatio,
-                    textFieldContentDescription = "user_input",
-                    label = userTextFieldDefaults().label,
-                    text = state.userText,
-                    isTalking = state.contentState == Constants.ContentStates.Recording,
-                    isTranscribing = state.contentState == Constants.ContentStates.Transcribing,
-                    isVoiceAssistant = false,
-                    shape = userTextFieldDefaults().shape,
-                    colors = userTextFieldDefaults().colors
+                Text(
+                    text = "Voice Assistant",
+                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(start = 12.dp, bottom = 2.dp)
                 )
 
-                Spacer(modifier = Modifier.height(15.dp))
-
-                ConversationText(
-                    cardAspectRatio = cardAspectRatio,
-                    textFieldContentDescription = "response_output",
-                    label = voiceAssistantTextFieldDefaults().label,
-                    text = state.responseText,
-                    isTalking = state.contentState == Constants.ContentStates.Speaking,
-                    playingAudio = state.playingAudio,
-                    isVoiceAssistant = true,
-                    shape = voiceAssistantTextFieldDefaults().shape,
-                    colors = voiceAssistantTextFieldDefaults().colors
-                )
+                AssistantBubble(text = (messages.first() as ChatMessage.AssistantText).text)
             }
+        } else {
+            // Normal message history
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
 
-            Spacer(modifier = Modifier.height(10.dp))
+                items(messages /*, key = { it.id } if you have one */) { message ->
+                    when (message) {
+                        is ChatMessage.UserText -> MessageItem(label = "User", isUser = true) {
+                            UserBubble(text = message.text)
+                        }
 
-            ActionButton(
-                onClickStartRecording = {
-                    when (recordingPermissionState.status) {
-                        PermissionStatus.Granted ->
-                            onClickStartRecording()
-                        else ->
-                            launcher.launch(Manifest.permission.RECORD_AUDIO)
+                        is ChatMessage.UserImage -> MessageItem(label = "User", isUser = true) {
+                            UserImageBubble(uri = message.uri)
+                        }
+
+                        is ChatMessage.AssistantText -> MessageItem(
+                            label = "Voice Assistant",
+                            isUser = false
+                        ) {
+                            AssistantBubble(text = message.text)
+                        }
                     }
-                },
-                onClickStopRecording = { onClickStopRecording() },
-                onClickCancelRecording = { openConfirmationDialog = true },
-                onClickCancel = { onClickCancel() },
-                contentState = state.contentState,
-                timerText = state.recTime,
-                animateIcon = state.contentState == Constants.ContentStates.Recording
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
         }
-    }
 
-}
+        Spacer(modifier = Modifier.height(10.dp))
 
-@OptIn(ExperimentalPermissionsApi::class)
-class PermissionStatePreview(
-    override val permission: String = Manifest.permission.RECORD_AUDIO,
-    override val status: PermissionStatus = PermissionStatus.Granted
-) : PermissionState {
-    override fun launchPermissionRequest() {}
-}
+        CombinedActionRow(
+            contentState = uiState.contentState,
+            timerText = uiState.recTime,
+            animateIcon = uiState.contentState == Constants.ContentStates.Recording,
+            onClickStartRecording = {
+                when (recordingPermissionState.status) {
+                    PermissionStatus.Granted -> viewModel.onStartRecording()
+                    else -> launcher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            },
+            onClickStopRecording = { viewModel.onStopRecording() },
+            onClickCancelRecording = { openConfirmationDialog = true },
+            onClickCancel = { viewModel.cancelPipeline() },
+            onAddImage = { uri -> viewModel.addImage(uri) },
+            showImageButton = viewModel.imageUploadEnabled
+        )
 
-@OptIn(ExperimentalPermissionsApi::class)
-@Preview(showBackground = true)
-@Composable
-private fun MainScreenPreview() {
-    VoiceAssistantTheme {
-        MainScreen(recordingPermissionState = PermissionStatePreview())
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }

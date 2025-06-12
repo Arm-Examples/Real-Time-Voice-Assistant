@@ -27,6 +27,9 @@ import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.mockito.junit.MockitoJUnitRunner
 
+/**
+ * UI test class for verifying interactions on the Main Screen.
+ */
 @RunWith(MockitoJUnitRunner::class)
 class MainScreenUITest {
 
@@ -36,6 +39,9 @@ class MainScreenUITest {
     private var mainViewModel: MainViewModel? = null
     private var mainUiState: StateFlow<MainUiState>? = null
 
+    /**
+     * Initializes the ViewModel with a mocked application context before each test.
+     */
     @Before
     fun setupViewModel() {
         val application: Application = Mockito.mock(Application::class.java)
@@ -47,10 +53,12 @@ class MainScreenUITest {
         mainUiState = mainViewModel?.uiState
     }
 
+    /**
+     * Sets up the Composable UI content including navigation and top bar.
+     */
     @Before
     fun setContent() {
-    composeTestRule.setContent()
-    {
+        composeTestRule.setContent {
         VoiceAssistantTheme {
             ScreenScaffold(
                 mainViewModel = mainViewModel!!
@@ -58,6 +66,11 @@ class MainScreenUITest {
         }
     }
 }
+
+
+    /**
+     * Cleans up the ViewModel and application context after each test.
+     */
     @After
     fun tearDown() {
         mainViewModel = null
@@ -65,6 +78,9 @@ class MainScreenUITest {
         AppContext.getInstance().context = null
     }
 
+    /**
+     * Verifies that the cancel button returns the content state to Idle from Responding.
+     */
     @Test
     fun testCancelPipeline() {
         mainViewModel?.setContentState(Constants.ContentStates.Responding)
@@ -73,6 +89,9 @@ class MainScreenUITest {
         assert(Constants.ContentStates.Idle == mainUiState?.value?.contentState)
     }
 
+    /**
+     * Verifies that canceling a recording displays a confirmation dialog and resets state to Idle.
+     */
     @Test
     fun testCancelRecording() {
         mainViewModel?.pipeline!!.initRecorder()
@@ -84,6 +103,9 @@ class MainScreenUITest {
         assert("" == mainUiState?.value?.responseText)
     }
 
+    /**
+     * Verifies that clicking the reset button clears the user input text.
+     */
     @Test
     fun testClearScreen() {
         mainViewModel?.setUserText("Populating user text box")

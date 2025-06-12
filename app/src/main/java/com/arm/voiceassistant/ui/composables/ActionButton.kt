@@ -51,8 +51,6 @@ import androidx.compose.ui.zIndex
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.Constants
 
-// Application talk button. (This name may change as development proceeds)
-
 /**
  * Properties to set for the main button, based on app content state
  * @property buttonContentDescription content description for main button
@@ -87,6 +85,17 @@ data class ButtonState(
     val timerText: String = "00:00"
 )
 
+/**
+ * Main action button that changes based on app state.
+ * @param modifier Layout modifier
+ * @param onClickStartRecording Called to start recording
+ * @param onClickStopRecording Called to stop recording
+ * @param onClickCancelRecording Called to cancel an ongoing recording
+ * @param onClickCancel Called to cancel processing
+ * @param contentState Current app state
+ * @param timerText Timer text shown during recording
+ * @param animateIcon If true, mic icon blinks while recording
+ */
 @Composable
 fun ActionButton(
     modifier: Modifier = Modifier,
@@ -158,6 +167,8 @@ fun ActionButton(
 
 /**
  * Main button for app functionality e.g. to start/stop recording, to start main pipeline
+ * @param modifier Layout modifier
+ * @param buttonState The current button style and behavior
  */
 @Composable
 private fun PipelineButton (

@@ -3,9 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package com.arm.voiceassistant.utils
-
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
@@ -22,11 +20,9 @@ import org.json.JSONObject
  */
 class AppContext private constructor() {
     companion object {
-
         @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instance: AppContext? = null
-
         fun getInstance() =
             instance ?: synchronized(this) {
                 instance ?: AppContext().also { instance = it }
@@ -34,7 +30,6 @@ class AppContext private constructor() {
     }
     var context: Context? = null
 }
-
 object Utils {
 
     data class UserLlmConfig(
@@ -42,15 +37,26 @@ object Utils {
         val userTag: String,
         val endTag: String,
         val llmPrefix: String,
+        val mediaTag: String,
         val stopWords: List<String>,
+        val inputModalities : List<String>,
+        val outputModalities : List<String>,
         val llmModelName: String,
+        val llmMmProjModelName: String,
         val batchSize: Int,
         val numThreads: Int
     )
 
+    /**
+     * Creates a default [UserLlmConfig] object for the given model path and framework.
+     * @param modelPath The file system path to the model
+     * @param framework The LLM backend framework to use (e.g., "llama.cpp", "onnx")
+     * @return A default-configured [UserLlmConfig] instance
+     */
     fun createLlmDefaultConfig(modelPath: String, framework: String): UserLlmConfig
     {
         val llmModelName: String
+        var llmMmProjModelName: String
         var userTag = ""
         var endTag = ""
         var stopWords:List<String> = mutableListOf(
@@ -58,22 +64,25 @@ object Utils {
             "[end of text]", "<|endoftext|>", "model:", "Question:", "\n\n",
             "Consider the following scenario:\n"
         )
+        var inputModalities:List<String> = mutableListOf()
+        var outputModalities:List<String> = mutableListOf()
         var llmPrefix = ""
         var modelTag = ""
         var modelPointer = ""
+        var mediaTag = ""
         var batchSize = 1
-
+        llmMmProjModelName = ""
         val transcript = "Transcript of a dialog, where the User interacts with an AI Assistant named Orbita."
-
-
         if (framework == "llama.cpp") {
-            llmModelName = "llama.cpp/model.gguf"
-
+            llmModelName = "llama.cpp/mmModel.gguf"
+            llmMmProjModelName = "llama.cpp/mmproj.gguf"
             llmPrefix = transcript + "Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences" + "User:"
             modelTag = " \n Orbita:"
-            modelPointer = "$modelPath/$llmModelName"
+            mediaTag = "<__media__>"
             batchSize = 256
-
+            inputModalities = listOf("text", "image")
+            outputModalities = listOf("text")
+            modelPointer = "$modelPath/$llmModelName"
         }
         else if (framework == "onnxruntime-genai")
         {
@@ -81,24 +90,28 @@ object Utils {
             stopWords= stopWords.plus("<|end|>")
             llmPrefix =
                 "<|system|>${transcript}Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences<|end|><|user|>"
-
             modelTag = "<|assistant|>"
             userTag = "<|user|>"
             endTag = "<|end|>"
             modelPointer = "$modelPath/$llmModelName"
             batchSize = 1
+            inputModalities = listOf("text", "image")
+            outputModalities = listOf("text")
         }
         //Default number of thread
         val cores = Runtime.getRuntime().availableProcessors()
         val numThreads = if (cores >= 8) 4 else 2
-
         return UserLlmConfig(
             modelTag,
             userTag,
             endTag,
             llmPrefix,
+            mediaTag,
             stopWords,
+            inputModalities,
+            outputModalities,
             modelPointer,
+            llmMmProjModelName,
             batchSize,
             numThreads
         )
@@ -111,12 +124,12 @@ object Utils {
         return try {
             val content = file.readText()
             if (content.isBlank()) return false
-
             val config = Gson().fromJson(content, UserLlmConfig::class.java)
-
             config != null &&
                     config.modelTag.isNotBlank() &&
                     config.llmModelName.isNotBlank() &&
+                    config.inputModalities.isNotEmpty() &&
+                    config.outputModalities.isNotEmpty() &&
                     config.llmPrefix.isNotBlank() &&
                     config.stopWords.isNotEmpty() &&
                     config.numThreads > 0 &&
@@ -132,6 +145,9 @@ object Utils {
 
     /**
      * Read LLM configurations defined by User
+     * @param file The user configuration file to read
+     * @param modelPath The path to the model, included in the resulting config
+     * @return An [UserLlmConfig] constructed from the file's contents
      */
     fun readLlmUserConfig(file: File, modelPath: String): JSONObject? {
         try {
@@ -140,15 +156,23 @@ object Utils {
             val userLlmConfig: UserLlmConfig = gson.fromJson(content, UserLlmConfig::class.java)
             val configJson = JSONObject(gson.toJson(userLlmConfig))
             configJson.put("llmModelName", modelPath + "/" + configJson.getString("llmModelName"))
+            if(configJson.has("llmMmProjModelName")) {
+                configJson.put(
+                    "llmMmProjModelName",
+                    modelPath + "/" + configJson.getString("llmMmProjModelName")
+                )
+            }
             return configJson
         } catch (e : Exception) {
-            Log.e(VOICE_ASSISTANT_TAG, "User configuration issue: $e")
+            Log.e(VOICE_ASSISTANT_TAG, "LLM configuration invalid: Exception: $e")
             return null
         }
     }
 
     /**
      * Check if config file is valid
+     * @param file The configuration file to validate
+     * @return true if the file contains valid and non-empty JSON content, false otherwise
      */
     fun isValidWhisperConfig(file: File): Boolean {
         return try {
@@ -180,9 +204,12 @@ object Utils {
             false
         }
     }
-     /**
-      * Reads a JSON file containing Whisper configuration and returns a WhisperConfig object.
-      */
+
+    /**
+     * Reads a JSON file containing Whisper configuration and returns a WhisperConfig object.
+     * @param file The Whisper configuration file to read
+     * @return A [WhisperConfig] object parsed from the JSON content
+     */
     fun readWhisperUserConfig(file: File): WhisperConfig {
         // Read the file content
         val content = file.readText()
@@ -211,8 +238,10 @@ object Utils {
             singleSegment
         )
     }
+
     /**
      * Create default configurations for whisper
+     * @return A [WhisperConfig] populated with preset values for common use cases
      */
     fun createWhisperDefaultConfig() : WhisperConfig
     {
@@ -232,6 +261,8 @@ object Utils {
 
     /**
      * Remove known tags from transcribed string
+     * @param transcribed The transcribed text to clean
+     * @return The cleaned string without tags
      */
     fun removeTags(transcribed: String): String {
         val tagsToRemove = "\\[.*?\\]|\\(.*?\\)".toRegex()
@@ -240,6 +271,8 @@ object Utils {
 
     /**
      * Remove characters such as emojis from the text string and return it
+     * @param text The input string to sanitize
+     * @return The ASCII-only version of the input string
      */
     private fun removeNonAsciiCharacters(text: String) : String {
         // Remove any character not between 0x0 and 0x7E. On Linux,
@@ -251,6 +284,8 @@ object Utils {
     /**
      * Remove select characters from the current string. Previous lines passed
      * to determine context.
+     * @param currentLine The line to sanitize
+     * @return The sanitized string with unnecessary characters removed
      */
     private fun removeSelectCharacters(lines: ArrayList<String>, currentLine: String) : String {
         var sanitizedWords = currentLine
@@ -262,6 +297,9 @@ object Utils {
 
     /**
      * Cleanup current line
+     * @param lines Previous lines used for context (e.g., markdown)
+     * @param currentLine The line to sanitize
+     * @return A cleaned-up version of the input line
      */
     fun cleanupLine(lines: ArrayList<String>, currentLine: String) : String {
         var sanitizedWords = removeNonAsciiCharacters(currentLine)
@@ -271,6 +309,8 @@ object Utils {
 
     /**
      * Return true if the string lines have a markdown code block
+     * @param lines List of previous lines
+     * @return true if a markdown code block is detected, false otherwise
      */
     private fun linesContainMarkdownCodeBlock(lines: ArrayList<String>) : Boolean {
         for (line in lines) {
@@ -282,6 +322,9 @@ object Utils {
 
     /**
      * Return true if the sentence should be broken for generated audio
+     * @param tokens The latest tokens received
+     * @param currentLine The sentence accumulated so far
+     * @return true if the sentence should be broken, false otherwise
      */
     fun breakSentence(tokens: String, currentLine: String): Boolean {
         var result = false
@@ -297,9 +340,11 @@ object Utils {
         return result
     }
 
-
     /**
      * Return true if the sentence should be broken for generated audio
+     * @param responses List of previously spoken or generated segments
+     * @param tokens The next token to evaluate
+     * @return true if the sentence should be split, false otherwise
      */
     fun breakSentenceAtPeriod(responses: List<String>, tokens: String) : Boolean {
         var result = false
@@ -311,6 +356,11 @@ object Utils {
         return result
     }
 
+    /**
+     * Checks whether the given token indicates the end of a response.
+     * @param token The text token to evaluate
+     * @return true if the token represents the end of a response, false otherwise
+     */
     fun responseComplete(token: String) : Boolean {
         return token.contains(Constants.EOS, true) ||
                 token.contains(Constants.NEXT_MESSAGE, true)

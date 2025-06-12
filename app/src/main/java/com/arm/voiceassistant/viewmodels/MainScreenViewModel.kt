@@ -7,7 +7,9 @@
 package com.arm.voiceassistant.viewmodels
 
 import android.app.Application
+import android.net.Uri
 import android.os.Environment
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arm.voiceassistant.Pipeline
@@ -21,14 +23,17 @@ import com.arm.voiceassistant.utils.Utils.responseComplete
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.arm.voiceassistant.utils.ChatMessage
 import kotlinx.coroutines.delay
-
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Main screen UI state
@@ -49,13 +54,16 @@ data class MainUiState(
     val error: Error = Error(),
     val userText: String = "",
     val responseText: String = "",
+    val imagePath: String = "",
     val recTime: String = "00:00",
     val recTimeMs: Long = 0,
     val playingAudio: Boolean = false,
     val displayPerformance: Boolean = false,
     val sttTime: String = INITIAL_METRICS_VALUE,
     val llmEncodeTPS: String = INITIAL_METRICS_VALUE,
-    val llmDecodeTPS: String = INITIAL_METRICS_VALUE
+    val llmDecodeTPS: String = INITIAL_METRICS_VALUE,
+    val isTTSEnabled: Boolean = false,
+    val TTSWarningMessage: String? = null
 )
 
 /**
@@ -68,6 +76,9 @@ data class Error(
     val message: String = ""
 )
 
+/**
+ * The default filename used for storing the recorded audio file.
+ */
 private const val FILE_NAME = "recording.wav"
 
 /**
@@ -75,28 +86,34 @@ private const val FILE_NAME = "recording.wav"
  * for the main screen along with executing any business logic.
  *
  * E.g. user input for inference options and running inference
+ * @param application The [Application] context required for file paths and resource access.
+ * @param isTest Boolean flag to indicate test mode, used to skip real pipeline initialization.
  */
 class MainViewModel(application: Application, isTest: Boolean = false) : ViewModel() {
     private val _uiState = MutableStateFlow(MainUiState())
     var uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
-
+    val messages: SnapshotStateList<ChatMessage> = mutableStateListOf()
     private val filePath: String =
         application.applicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)!!.absolutePath
-
+    private val tmpFilePath: File =
+        application.applicationContext.cacheDir
+    private val contentResolver = application.contentResolver
     var pipeline: Pipeline
-
     private var timer: Timer = Timer()
     private var delayMilliseconds = 21L
     private var useAsyncLLM = true
-
     private var llmResponseGenerationJob: Job? = null
-
     private var subscriber: ResponseSubscriber = ResponseSubscriber(this)
+    var imageUploadEnabled: Boolean = false
 
+    /**
+     * Initialization block for the ViewModel.
+     */
     init {
         reset()
         pipeline = Pipeline(filePath, isTest)
         pipeline.setSubscriber(subscriber)
+        imageUploadEnabled = pipeline.supportsImageInput()
     }
 
     /**
@@ -121,7 +138,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun onStartRecording() {
         // Reset state from previous run
-        clearText()
+        clearResponseText()
         //clearPerformanceMetrics()
         _uiState.update { currentState -> currentState.copy(playingAudio = false, recTimeMs = 0) }
         timer.reset()
@@ -224,6 +241,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         _uiState.update { currentState ->
             currentState.copy(userText = text)
         }
+        messages.add(ChatMessage.UserText(text))
     }
 
     /**
@@ -232,6 +250,31 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     private fun clearText() {
         _uiState.update { currentState ->
             currentState.copy(userText = "", responseText = "")
+        }
+        messages.clear()
+    }
+
+    /**
+     * Reset user and voice assistant text box values
+     */
+    private fun clearPerfMetrics() {
+        _uiState.update { currentState ->
+            currentState.copy(
+                sttTime = INITIAL_METRICS_VALUE,
+                llmEncodeTPS = INITIAL_METRICS_VALUE,
+                llmDecodeTPS = INITIAL_METRICS_VALUE,
+                displayPerformance = false
+            )
+        }
+    }
+
+    /**
+     * Reset voice assistant text box values
+     */
+    private fun clearResponseText()
+    {
+        _uiState.update { currentState ->
+            currentState.copy( responseText = "")
         }
     }
 
@@ -254,9 +297,12 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         reset()
     }
 
-
+    /**
+     * Resets the user input and performance metrics.
+     */
     fun resetUserText() {
         clearText()
+        clearPerfMetrics()
     }
 
     /**
@@ -275,7 +321,9 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
     }
 
-
+    /**
+     * Updates the UI state with the latest speech recognition time.
+     */
     private fun updateSpeechRecTime() {
         _uiState.update { currentState ->
             currentState.copy(
@@ -313,6 +361,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         _uiState.update { currentState ->
             currentState.copy(responseText = text)
         }
+        messages.add(ChatMessage.AssistantText(text))
     }
 
     /**
@@ -340,9 +389,8 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         // Synchronous so responses is an empty array
         val sanitizedWords = Utils.cleanupLine(arrayListOf(), speechText)
 
-        if (pipeline.speechSynthesisInitialized()) {
+        if (uiState.value.isTTSEnabled && pipeline.speechSynthesisInitialized()) {
             setResponseText(sanitizedWords)
-
             updateToSpeakingState()
             // Log time from end of recording to first speech synthesis
             pipeline.getTimers().toggleRealTimer(start = false, dump = true)
@@ -351,11 +399,17 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
                 pipeline.generateSpeech(sanitizedWords)
                 updateToIdleState()
             }
+        } else {
+            // Skip speaking, just show response
+            setResponseText(sanitizedWords)
+            updateToIdleState()
         }
     }
 
     /**
      * Dispatch the response job
+     * @param work A suspend lambda that performs the response generation logic.
+     * @throws RuntimeException if an existing response job is still running.
      */
     private fun dispatchLLMResponseGenerationJob(work: suspend () -> Unit) {
         if (llmResponseGenerationJob != null) {
@@ -371,6 +425,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
 
     /**
      * Generate response (async)
+     * @param transcription The user's transcribed input to be processed by the LLM.
      */
     private suspend fun generateResponseTokens(transcription: String) {
         pipeline.generateResponseTokens(transcription)
@@ -384,6 +439,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             // Generate a response
             setContentState(ContentStates.Responding)
             dispatchLLMResponseGenerationJob {
+                messages.add(ChatMessage.AssistantText(""))
                 generateResponseTokens(
                     uiState.value.userText
                 )
@@ -391,6 +447,11 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
     }
 
+    /**
+     * Updates the UI state with the latest LLM performance metrics.
+     * @param encode The LLM's encode speed in tokens per second.
+     * @param decode The LLM's decode speed in tokens per second.
+     */
     private fun updateLLMTokensPerSec(encode : Float, decode : Float) {
         _uiState.update { currentState ->
             currentState.copy(llmEncodeTPS = "%.2f".format(encode), llmDecodeTPS = "%.2f".format(decode))
@@ -399,6 +460,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
 
     /**
      * Callback to handle the response generation for LLM
+     * @param tokens The latest chunk of response tokens received from the LLM.
      */
      suspend fun generatedResponseCallback(tokens: String?) {
         if (tokens != null) {
@@ -406,8 +468,8 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
                 pipeline.finalizeSpeechSynthesis()
                 updateToIdleState()
                 updateLLMTokensPerSec(pipeline.getEncodeTokensPerSec(), pipeline.getDecodeTokensPerSec())
-            } else {
-                if (! pipeline.speechSynthesisInProgress()) {
+            } else if (uiState.value.isTTSEnabled) {
+                if (!pipeline.speechSynthesisInProgress()) {
                     pipeline.getTimers().toggleFirstResponseTimer(start = false, dump = true)
                     pipeline.startSpeechSynthesis()
                 }
@@ -443,12 +505,17 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
     }
 
-
     /**
      * Used by the pipeline to update the response field after each sentence is spoken
+     * @param tokens The latest response segment generated by the assistant.
      */
     fun updateResponseFieldCallback(tokens: String) {
         appendResponseText(tokens)
+        val lastIndex = messages.indexOfLast { it is ChatMessage.AssistantText }
+        if (lastIndex != -1) {
+            val currentText = uiState.value.responseText
+            messages[lastIndex] = ChatMessage.AssistantText(currentText)
+        }
     }
 
     /**
@@ -464,4 +531,56 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
     }
 
+    /**
+     * Handles adding an image selected by the user into the chat workflow.
+     * @param uri The [Uri] of the image selected by the user.
+     */
+    fun addImage(uri: Uri) {
+        Log.d("tag", "User selected image URI = $uri")
+        val inputStream = contentResolver.openInputStream(uri)
+        val filename = "image_${System.currentTimeMillis()}.jpg"
+        val originalResFile = File(filePath, filename)
+        val outputStream = FileOutputStream(originalResFile)
+        inputStream?.copyTo(outputStream)
+        pipeline.addImageToLLmDialog(originalResFile, tmpFilePath.absolutePath)
+        _uiState.update { currentState ->
+            currentState.copy(imagePath = originalResFile.absolutePath)
+        }
+        val imageUri = Uri.fromFile(originalResFile)
+        messages.add(ChatMessage.UserImage(imageUri))
+    }
+
+    /**
+     * Sets the current UI state manually, used for testing purposes.
+     * @param state The new test state to assign.
+     */
+    fun setUiStateForTest(state: MainUiState) {
+        _uiState.value = state
+    }
+
+    /**
+     * Toggles the Text-to-Speech (TTS) enabled state.
+     */
+    fun toggleTTS() {
+        val isTurningOn = !_uiState.value.isTTSEnabled
+        if (isTurningOn && !pipeline.speechSynthesisInitialized()) {
+            _uiState.update {
+                it.copy(TTSWarningMessage = "TTS is not available.")
+            }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                isTTSEnabled = !it.isTTSEnabled,
+                TTSWarningMessage = null
+            )
+        }
+    }
+
+    /**
+     * Clears the TTS warning message
+     */
+    fun clearTTSWarningMessage() {
+        _uiState.update { it.copy(TTSWarningMessage = null) }
+    }
 }

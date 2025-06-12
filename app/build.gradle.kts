@@ -11,9 +11,11 @@ plugins {
 
 project.ext.set("STT_MODELS_DIR", "$projectDir/../stt/stt-src/resources_downloaded/models/")
 project.ext.set("LLM_MODELS_DIR", "$projectDir/../llm/llm-src/resources_downloaded/models/")
+project.ext.set("IMAGES_DIR", "$projectDir/../resources/images/")
 project.ext.set("CONFIG_DIR", "$projectDir/src/model_configuration_files/")
 project.ext.set("DEVICE_FOLDER", "/storage/emulated/0/Android/data/com.arm.voiceassistant/files/Download/")
-project.ext.set("PUSH_MODELS_PY", "$projectDir/pushModels.py")
+project.ext.set("PUSH_MODELS_PY", "$projectDir/pushAppResources.py")
+
 
 apply("download.gradle")
 
@@ -27,7 +29,12 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
+        // Use the value prepared at the root during sync:
+        buildConfigField(
+            "String",
+            "LLM_FRAMEWORK",
+            "\"${rootProject.extra["LLM_FRAMEWORK"] as String}\""
+        )
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -61,6 +68,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -89,6 +97,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.google.accompanist.permissions)
     implementation(libs.google.gson)
+    implementation(libs.glide.compose)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.espresso.core)

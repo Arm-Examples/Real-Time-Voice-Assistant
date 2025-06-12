@@ -12,8 +12,14 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.arm.voiceassistant.VoiceAssistantApplication
 
-
+/**
+ * Object that provides a shared [MainViewModel] instance using a [ViewModelProvider.Factory].
+ * This factory ensures the [MainViewModel] is created with the required [VoiceAssistantApplication] context.
+ */
 object ViewModelProvider {
+    /**
+     * Factory used to create an instance of [MainViewModel] with application context.
+     */
     val Factory = viewModelFactory {
         // MainViewModel initialize
         initializer {
@@ -25,7 +31,9 @@ object ViewModelProvider {
 }
 
 /**
- * Returns casted instance of VoiceAssistantApplication from CreationExtras map using the provided key
+ * Extension function that retrieves the [VoiceAssistantApplication] instance from the [CreationExtras]
+ * used during ViewModel initialization.
+ * @return The [VoiceAssistantApplication] instance passed into the ViewModel creation.
  */
 fun CreationExtras.voiceAssistantApplication(): VoiceAssistantApplication =
     (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as VoiceAssistantApplication)

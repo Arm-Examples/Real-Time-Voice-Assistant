@@ -26,33 +26,42 @@ import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.viewmodels.MainViewModel
 
-// Main activity referenced in AndroidManifest.xml which sets up the screens
-
+/**
+ * Main activity referenced in AndroidManifest.xml which sets up the screens
+ *
+ * This activity handles:
+ * - UI composition using Jetpack Compose
+ * - Permission handling for microphone access
+ * - Initializing and retaining the main view model instance
+ */
 class MainActivity : ComponentActivity() {
-    // Save the mainViewModel for the post initialized parts
-    private lateinit var mainViewModel: MainViewModel
-    // Permissions required
-    private val permissions = arrayOf(RECORD_AUDIO, MODIFY_AUDIO_SETTINGS)
 
-    // Permission request launcher
-    private val requestPermissionLauncher = registerForActivityResult(
+    private lateinit var mainViewModel: MainViewModel                       // Save the mainViewModel for the post initialized parts
+    private val permissions = arrayOf(RECORD_AUDIO, MODIFY_AUDIO_SETTINGS)  // Permissions required
+    private val requestPermissionLauncher = registerForActivityResult(      // Permission request launcher
         ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         val allPermissionsGranted = permissions.entries.all { it.value }
         if (!allPermissionsGranted) {
-            // Handle the denied permission requests as the permission request intent will not
-            // pop up after the user denied the permission request twice. If we finish the app here,
-            // the app will be finished immediately without any instructions after the permission is denied twice.
-            // This handler will navigate the user to 'Settings' and get the permission setup according to the instructions.
+            /**
+             * Handle the denied permission requests as the permission request intent will not
+             * pop up after the user denied the permission request twice. If we finish the app here,
+             * the app will be finished immediately without any instructions after the permission is denied twice.
+             * This handler will navigate the user to 'Settings' and get the permission setup according to the instructions.
+             */
             handlePermissionsNotGranted(permissions)
         }
     }
 
+    /**
+     * Called when the activity is created. Initializes the UI and launches the permission request.
+     * @param savedInstanceState Saved state bundle, if available
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
             VoiceAssistantTheme {
-                // A surface container using the 'background' color from the theme
+
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -60,6 +69,7 @@ class MainActivity : ComponentActivity() {
                     AppContext.getInstance().context = this
 
                     // Build the screen and return the mainViewModel for post init
+                    // Pass imageUploadAction composable
                     mainViewModel = ScreenScaffold()
 
                     // Check the permissions
@@ -69,7 +79,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Pop up a Dialog and navigate the user to the Settings if the user denied the permission request
+    /**
+     * Displays a dialog when permissions are permanently denied and navigates
+     * the user to the app's settings page to manually grant them.
+     * @param permissions Map of permission results from the launcher
+     */
     private fun handlePermissionsNotGranted(permissions: Map<String, Boolean>) {
         val permanentlyDeniedPermissions = permissions.filter { !it.value && !shouldShowRequestPermissionRationale(it.key) }
         if (permanentlyDeniedPermissions.isNotEmpty()) {

@@ -33,6 +33,13 @@ import androidx.compose.ui.unit.sp
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.Constants.INITIAL_METRICS_VALUE
 
+/**
+ * Displays model performance metrics in a vertical column.
+ * @param modifier Modifier for layout customization
+ * @param model1metric Value for speech recognition time
+ * @param model2metric Value for LLM encode tokens per second
+ * @param model3metric Value for LLM decode tokens per second
+ */
 @Composable
 fun ModelMetrics(
     modifier: Modifier = Modifier,
@@ -76,7 +83,12 @@ fun ModelMetrics(
     }
 }
 
-
+/**
+ * Displays a toggle switch to show or hide performance metrics.
+ * @param modifier Modifier for layout styling
+ * @param togglePerformance Callback triggered when the switch is toggled
+ * @param displayPerformance Current toggle state (true = show metrics)
+ */
 @Composable
 fun TogglePerformance(
     modifier: Modifier = Modifier,
@@ -116,6 +128,9 @@ fun TogglePerformance(
     }
 }
 
+/**
+ * Toggle performance preview
+ */
 @Preview(showBackground = true)
 @Composable
 private fun TogglePerformancePreview() {
@@ -124,4 +139,3 @@ private fun TogglePerformancePreview() {
         ModelMetrics()
     }
 }
-

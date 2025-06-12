@@ -83,7 +83,7 @@ class UtilsTest {
         assertEquals("", defaultConfig.endTag)
         assertEquals(stopWords, defaultConfig.stopWords)
         assertEquals(256, defaultConfig.batchSize)
-        assertEquals("$modelPath/llama.cpp/model.gguf", defaultConfig.llmModelName)
+        assertEquals("$modelPath/llama.cpp/mmModel.gguf", defaultConfig.llmModelName)
     }
 
     /**

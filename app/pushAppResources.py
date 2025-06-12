@@ -5,9 +5,9 @@
 #
 
 """
-pushModel.py
+Utility script to push resources needed by the app onto device.
 
-Pushes local model/configuration files to an Android device using ADB.
+Pushes local models, configuration files and test images to an Android device using ADB.
 
 Supports:
 - STT model files (flat files)

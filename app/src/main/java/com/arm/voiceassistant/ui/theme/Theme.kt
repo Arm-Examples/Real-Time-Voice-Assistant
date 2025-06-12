@@ -25,7 +25,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-
+/**
+ * Defines the custom light color scheme for the app using Arm brand colors.
+ */
 val ArmLightColorScheme = lightColorScheme(
     primary = ArmColors.ArmBlue,
     onPrimary = ArmColors.ArmLightBlue,
@@ -41,6 +43,9 @@ val ArmLightColorScheme = lightColorScheme(
     onError = ArmColors.ArmLightGray
 )
 
+/**
+ * Defines the custom dark color scheme for the app using Arm brand colors.
+ */
 val ArmDarkColorScheme = darkColorScheme(
     primary = ArmColors.ArmBlack,
     onPrimary = ArmColors.ArmBlue,
@@ -56,7 +61,9 @@ val ArmDarkColorScheme = darkColorScheme(
     onError = ArmColors.ArmLightGray
 )
 
-// Background color modifier dependent on mode
+/**
+ * Applies a background color based on the current theme.
+ */
 fun Modifier.backgroundColorModifier(): Modifier = composed {
     val mod =
         if (isSystemInDarkTheme()) {
@@ -69,6 +76,12 @@ fun Modifier.backgroundColorModifier(): Modifier = composed {
     this then mod
 }
 
+/**
+ * Applies the app's custom Material3 theme.
+ * @param darkTheme Whether to use the dark color scheme (default: system setting)
+ * @param dynamicColor Whether to use dynamic colors on Android 12+ (default: false)
+ * @param content The composable UI content to apply the theme to
+ */
 @Composable
 fun VoiceAssistantTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

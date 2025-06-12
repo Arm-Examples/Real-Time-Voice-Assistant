@@ -28,10 +28,14 @@ import androidx.compose.ui.unit.dp
 import com.arm.voiceassistant.Pipeline
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 
-
 var pipeline: Pipeline? = null
 
-// Application top navigation bar
+/**
+ * Displays the top app bar with title and action buttons.
+ * @param modifier Layout modifier
+ * @param resetUserText Callback to clear user input and context
+ * @param togglePerformance Callback to toggle performance metrics
+ */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,9 +43,10 @@ fun TopBar(
     modifier: Modifier = Modifier,
     resetUserText: () -> Unit = {},
     togglePerformance: () -> Unit = {},
-    resetPerformanceMetrics: () -> Unit = {}
-){
-
+    resetPerformanceMetrics: () -> Unit = {},
+    toggleTTS: () -> Unit = {},
+    isTTSEnabled: Boolean = true
+) {
     CenterAlignedTopAppBar(
         modifier = modifier.height(40.dp),
         title = {
@@ -70,6 +75,11 @@ fun TopBar(
             }
         },
         actions = {
+            TTSToggleButton(
+                isEnabled = isTTSEnabled,
+                onToggle = toggleTTS
+            )
+
             IconButton(
                 onClick = {
                     pipeline?.resetContext()
@@ -86,18 +96,34 @@ fun TopBar(
     )
 }
 
+/**
+ * Top bar home preview
+ */
 @Preview
 @Composable
-private fun PreviewTopBarHome(){
+private fun TopBarHomePreview() {
     VoiceAssistantTheme {
-        TopBar()
+        TopBar(
+            resetUserText = {},
+            togglePerformance = {},
+            toggleTTS = {},
+            isTTSEnabled = true
+        )
     }
 }
 
+/**
+ * Top bar settings preview
+ */
 @Preview
 @Composable
-private fun PreviewTopBarSettings(){
+private fun TopBarSettingsPreview() {
     VoiceAssistantTheme {
-        TopBar()
+        TopBar(
+            resetUserText = {},
+            togglePerformance = {},
+            toggleTTS = {},
+            isTTSEnabled = true
+        )
     }
 }

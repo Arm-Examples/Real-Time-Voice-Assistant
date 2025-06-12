@@ -6,6 +6,9 @@
 
 package com.arm.voiceassistant.utils
 
+/**
+ * Holds global constants used throughout the app.
+ */
 object Constants {
     // Log tag
     const val VOICE_ASSISTANT_TAG = "VoiceAssistant"

@@ -6,59 +6,77 @@
 
 package com.arm.voiceassistant.ui
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onChildAt
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import com.arm.voiceassistant.ui.screens.MainScreen
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.Constants
+import com.arm.voiceassistant.utils.AppContext
+import com.arm.voiceassistant.utils.ChatMessage
+import com.arm.voiceassistant.viewmodels.MainViewModel
 import com.arm.voiceassistant.viewmodels.MainUiState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import org.junit.Rule
 import org.junit.Test
+import android.app.Application
+import android.content.Context
+import org.junit.Before
+import org.mockito.Mockito
+import androidx.test.platform.app.InstrumentationRegistry
 
+/**
+ * UI State tests for the MainScreen.
+ * This class verifies how the UI reacts based on various states of MainUiState.
+ */
 class UiStateTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+    private lateinit var application: Application
+    private val startRecordingButton get() = composeTestRule.onNodeWithContentDescription("record")
+    private val stopRecordingButton get() = composeTestRule.onNodeWithContentDescription("stop_recording")
+    private val cancelRecordingButton get() = composeTestRule.onNodeWithContentDescription("cancel_recording")
+    private val cancelPipelineButton get() = composeTestRule.onNodeWithContentDescription("cancel")
+    private val cancellingPipelineButton get() = composeTestRule.onNodeWithContentDescription("cancelling")
 
-    private var userTextBox =
-        composeTestRule.onNodeWithContentDescription("user_input")
-    private var responseTextBox =
-        composeTestRule.onNodeWithContentDescription("response_output")
-    private var startRecordingButton =
-        composeTestRule.onNodeWithContentDescription("record")
-    private var stopRecordingButton =
-        composeTestRule.onNodeWithContentDescription("stop_recording")
-    private var cancelRecordingButton =
-        composeTestRule.onNodeWithContentDescription("cancel_recording")
-    private var cancelPipelineButton =
-        composeTestRule.onNodeWithContentDescription("cancel")
-    private var cancellingPipelineButton =
-        composeTestRule.onNodeWithContentDescription("cancelling")
-    private var userIcon =
-        composeTestRule.onNodeWithContentDescription("user_icon")
-    private var assistantIcon =
-        composeTestRule.onNodeWithContentDescription("voice_assistant_icon")
-
-    private fun setContent(screen: @Composable () -> Unit) {
-        composeTestRule.setContent {
-            VoiceAssistantTheme {
-                screen()
-            }
-        }
+    /**
+     * Sets up a mocked application context before each test.
+     */
+    @Before
+    fun setupAppContext() {
+        application = Mockito.mock(Application::class.java)
+        val appContext: Context = InstrumentationRegistry.getInstrumentation().targetContext
+        Mockito.`when`(application.applicationContext).thenReturn(appContext)
+        AppContext.getInstance().context = appContext
     }
 
+    /**
+     * Helper method to launch MainScreen with a given UI state.
+     */
     @OptIn(ExperimentalPermissionsApi::class)
+    private fun launchScreenWithState(state: MainUiState): MainViewModel {
+        val viewModel = MainViewModel(application, isTest = true)
+        viewModel.setUiStateForTest(state)
+
+        composeTestRule.setContent {
+            VoiceAssistantTheme {
+                MainScreen(viewModel = viewModel)
+            }
+        }
+        return viewModel
+    }
+
+    /**
+     * Verify UI components are in the correct state when the app is idle.
+     */
     @Test
     fun testInitialIdleState() {
-        setContent { MainScreen(state = MainUiState()) }
+        launchScreenWithState(MainUiState())
 
         startRecordingButton.assertExists()
         startRecordingButton.assertTextEquals("Press to talk")
@@ -68,18 +86,14 @@ class UiStateTest {
         cancelRecordingButton.assertDoesNotExist()
         cancelPipelineButton.assertDoesNotExist()
         cancellingPipelineButton.assertDoesNotExist()
-
-        // assert text boxes are blank
-        userTextBox.assert(hasText(""))
-        responseTextBox.assert(hasText(""))
-
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify UI elements for the Recording state.
+     */
     @Test
     fun testRecordingState() {
-        setContent { MainScreen(state = MainUiState(
-            contentState = Constants.ContentStates.Recording)) }
+        launchScreenWithState(MainUiState(contentState = Constants.ContentStates.Recording))
 
         stopRecordingButton.assertExists()
         stopRecordingButton.assertTextContains("Recording... press to finish")
@@ -90,17 +104,14 @@ class UiStateTest {
         startRecordingButton.assertDoesNotExist()
         cancelPipelineButton.assertDoesNotExist()
         cancellingPipelineButton.assertDoesNotExist()
-
-        userIcon.onChild().assertContentDescriptionEquals("RecordVoiceOver")
-        assistantIcon.onChild().assertContentDescriptionEquals("Person")
-
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify UI for Transcribing state.
+     */
     @Test
     fun testTranscribingState() {
-        setContent { MainScreen(state = MainUiState(
-            contentState = Constants.ContentStates.Transcribing)) }
+        launchScreenWithState(MainUiState(contentState = Constants.ContentStates.Transcribing))
 
         cancelPipelineButton.assertExists()
         cancelPipelineButton.assertTextEquals("Cancel")
@@ -110,17 +121,14 @@ class UiStateTest {
         stopRecordingButton.assertDoesNotExist()
         cancelRecordingButton.assertDoesNotExist()
         cancellingPipelineButton.assertDoesNotExist()
-
-        userIcon.onChild().assertContentDescriptionEquals("Person")
-        assistantIcon.onChild().assertContentDescriptionEquals("Person")
-
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify UI for Responding state.
+     */
     @Test
     fun testRespondingState() {
-        setContent { MainScreen(state = MainUiState(
-            contentState = Constants.ContentStates.Responding)) }
+        launchScreenWithState(MainUiState(contentState = Constants.ContentStates.Responding))
 
         cancelPipelineButton.assertExists()
         cancelPipelineButton.assertTextEquals("Cancel")
@@ -130,16 +138,14 @@ class UiStateTest {
         stopRecordingButton.assertDoesNotExist()
         cancelRecordingButton.assertDoesNotExist()
         cancellingPipelineButton.assertDoesNotExist()
-
-        userIcon.onChild().assertContentDescriptionEquals("Person")
-        assistantIcon.onChild().assertContentDescriptionEquals("Person")
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify UI for Speaking state.
+     */
     @Test
     fun testSpeakingState() {
-        setContent { MainScreen(state = MainUiState(
-            contentState = Constants.ContentStates.Responding)) }
+        launchScreenWithState(MainUiState(contentState = Constants.ContentStates.Speaking))
 
         cancelPipelineButton.assertExists()
         cancelPipelineButton.assertTextEquals("Cancel")
@@ -149,16 +155,14 @@ class UiStateTest {
         stopRecordingButton.assertDoesNotExist()
         cancelRecordingButton.assertDoesNotExist()
         cancellingPipelineButton.assertDoesNotExist()
-
-        userIcon.onChild().assertContentDescriptionEquals("Person")
-        assistantIcon.onChild().assertContentDescriptionEquals("Person")
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify UI for Cancelling state.
+     */
     @Test
     fun testCancellingState() {
-        setContent { MainScreen(state = MainUiState(
-            contentState = Constants.ContentStates.Cancelling)) }
+        launchScreenWithState(MainUiState(contentState = Constants.ContentStates.Cancelling))
 
         cancellingPipelineButton.assertExists()
         cancellingPipelineButton.assertTextEquals("Cancelling...")
@@ -167,27 +171,28 @@ class UiStateTest {
         stopRecordingButton.assertDoesNotExist()
         cancelRecordingButton.assertDoesNotExist()
         cancelPipelineButton.assertDoesNotExist()
-
-        userIcon.onChild().assertContentDescriptionEquals("Person")
-        assistantIcon.onChild().assertContentDescriptionEquals("Person")
-
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify text content visibility in the user and assistant bubbles.
+     */
     @Test
     fun testTextVisible() {
-        val exampleUserText = "Example transcription of speech from user"
-        val exampleResponseText = "Example response from Voice Assistant"
-        setContent { MainScreen(state = MainUiState(
-            contentState = Constants.ContentStates.Responding,
-            userText = exampleUserText,
-            responseText = exampleResponseText)) }
+        val userText = "Example transcription of speech from user"
+        val responseText = "Example response from Voice Assistant"
+        val viewModel = launchScreenWithState(MainUiState(contentState = Constants.ContentStates.Responding))
 
-        userTextBox.assert(hasText(exampleUserText))
-        responseTextBox.assert(hasText(exampleResponseText))
+        viewModel.messages.add(ChatMessage.UserText(userText))
+        viewModel.messages.add(ChatMessage.AssistantText(responseText))
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(userText).assertExists()
+        composeTestRule.onNodeWithText(responseText).assertExists()
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
+    /**
+     * Verify that model metrics are displayed correctly when toggled.
+     */
     @Test
     fun testPerformanceMetricsVisible() {
         val sttTime = "1.4"
@@ -202,17 +207,47 @@ class UiStateTest {
         val model3metric =
             composeTestRule.onNodeWithContentDescription("LLM decode tokens/s")
 
-        setContent { MainScreen(state = MainUiState(
-            displayPerformance = true,
-            sttTime = sttTime,
-            llmEncodeTPS = llmEncodeTPS,
-            llmDecodeTPS = llmDecodeTPS
+        launchScreenWithState(
+            MainUiState(
+                displayPerformance = true,
+                sttTime = sttTime,
+                llmEncodeTPS = llmEncodeTPS,
+                llmDecodeTPS = llmDecodeTPS
+            )
         )
-        ) }
-
         model1metric.onChildAt(1).assertTextEquals(sttTime)
         model2metric.onChildAt(1).assertTextEquals(llmEncodeTPS)
         model3metric.onChildAt(1).assertTextEquals(llmDecodeTPS)
     }
 
+    /**
+     * Ensure user text bubble is rendered correctly.
+     */
+    @Test
+    fun testUserTextBubbleRenders() {
+        val userText = "This is a user message."
+        val viewModel = launchScreenWithState(MainUiState())
+
+        viewModel.messages.add(ChatMessage.UserText(userText))
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("User").assertExists()
+        composeTestRule.onNodeWithText(userText).assertExists()
+    }
+
+    /**
+     * Ensure assistant welcome message is shown on first launch.
+     */
+    @Test
+    fun testInitialWelcomeMessageAppears() {
+        val welcome = "I'm your AI assistant. How can I help you?"
+        val viewModel = launchScreenWithState(MainUiState())
+
+        viewModel.messages.add(ChatMessage.AssistantText(welcome))
+
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onAllNodesWithText("Voice Assistant").onFirst().assertExists()
+        composeTestRule.onNodeWithText(welcome).assertExists()
+    }
 }

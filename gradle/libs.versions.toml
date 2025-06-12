@@ -22,6 +22,7 @@ mockitoAndroid = "5.8.0"
 navigationRuntimeKtx = "2.8.3"
 navigationCompose = "2.8.3"
 navigationTesting = "2.8.3"
+glideCompose = "1.0.0-alpha.5"
 
 [libraries]
 
@@ -46,7 +47,7 @@ google-accompanist-permissions = { group = "com.google.accompanist", name = "acc
 google-gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson"}
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockito-android = { module = "org.mockito:mockito-android", version.ref = "mockitoAndroid" }
-
+glide-compose = { group = "com.github.bumptech.glide", name = "compose", version.ref = "glideCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

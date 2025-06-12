@@ -14,6 +14,7 @@
   * [Application pipeline](#application-pipeline)
     * [Speech to Text Library](#speech-to-text-library)
     * [Large Language Models Library](#large-language-models-library)
+        * [Visual Question Answering (Optional)](#visual-question-answering-optional)
     * [Text to Speech Component](#text-to-speech-component)
   * [KleidiAI Configuration](#kleidiai-configuration)
   * [LLM Framework](#llm-framework)
@@ -24,6 +25,7 @@
   * [Supported ABIs](#supported-abis)
   * [Supported NDK Versions](#supported-ndk-versions)
   * [Troubleshooting](#troubleshooting)
+  * [Known issues](#known-issues)
   * [License](#license)
 <!-- TOC -->
 
@@ -40,7 +42,7 @@ for optimized performance on Arm® CPU.
 ## Pre-requisites
 
 1. Download and install the latest version of [Android Studio](https://developer.android.com/studio)
-2. Install the [Android NDK](https://developer.android.com/studio/projects/install-ndk). This project was tested with Android NDK r27.
+2. Install the [Android NDK](https://developer.android.com/studio/projects/install-ndk). This project was tested with Android NDK r25.
 3. Python 3 must be installed. It is used to push resources and model files to the device.
 
 ## Dependencies
@@ -85,7 +87,7 @@ Speech recognition is done in the following stages:
 
 ### Large Language Models Library
 
-Large Language Models (LLMs) are designed for natural language understanding, and in this application, 
+Large Language Models (LLMs) are designed for natural language understanding, and in this application,
 they are used for question-answering.  The text transcription from previous part
 of the pipeline is used as an input to the neural model. During initialization,
 the application assigns a persona to the LLM to ensure a friendly and informative voice assistant experience.
@@ -93,13 +95,18 @@ By default, the application uses asynchronous flow for this part of the pipeline
 are collected as they become available. The application UI is updated with each new token
 and these are also used for final stage of the pipeline.
 
+##### Visual Question Answering (Optional)
+The application includes support for Visual Question Answering (VQA), enabling users to provide an image as input and subsequently query the model with natural language questions grounded in that visual context.
+To initiate VQA, the image must be uploaded prior to starting the voice recording. Upon upload, the image undergoes encoding via the integrated vision encoder, producing a set of visual embeddings.
+These embeddings are retained in the chat context until the context is explicitly reset, allowing for multi-turn interaction and follow-up queries based on the same image.
+
 ### Text to Speech Component
 
 Currently, this part of the application pipeline is using Android Text-to-Speech API
 with some extra functionality in the application to ensure smooth and natural speech output.
 In synchronous mode, speech is only generated after the full response from LLM is received.
 By default, the application operates in asynchronous mode, where speech synthesis starts as soon as a sufficient portion
-of the response (such as a half or full sentence) is available. 
+of the response (such as a half or full sentence) is available.
 Any additional responses are queued for processing by the Android Text-to-Speech engine.
 
 ## KleidiAI Configuration
@@ -128,9 +135,10 @@ If no value is provided, the default is used.
 > **NOTE**: The default value is defined in [gradle properties](gradle.properties) and can be modified
 > if a different framework is preferred by default.
 
+
 ## Custom LLM Configuration
 
-In addition to the default settings, this application allows you to provide custom configuration parameters for the LLM via a JSON-formatted file named `app/src/model_configuration_files/{LLM Framework Name}ConfigUser.json`. This file must contain the following mandatory keys:
+In addition to the default settings, this application allows you to provide custom configuration parameters for the LLM via a JSON-formatted file named `app/src/model_configuration_files/{LLM Framework Name}{Text or Vision}ConfigUser.json`. This file must contain the following mandatory keys:
 * `modelTag`: A string used as an identifier or tag for the model.
 * `userTag`: A string used as tag for the user.
 * `endTag`: A string used as tag to mark the end of the query.
@@ -138,8 +146,18 @@ In addition to the default settings, this application allows you to provide cust
 * `llmModelName`: The filename of the LLM model to be used.
 * `llmPrefix`: A string acting as a prefix to the input text, typically providing context or instructions for the model.
 * `numThreads`: An integer that specifies the number of threads the LLM should use.
+* `inputModalities`: A list defining supported input modalities.
+   Example: ["text"] for text-only, or ["text", "image"] for text + vision models.
+* `outputModalities`: A list defining supported output modalities.
+   Currently, only ["text"] is supported.
 
 You only need to modify the values associated with these keys if you wish to customize the LLM's behavior. Do not remove any of the keys, as they are mandatory for the configuration to work properly.
+
+If utilizing the **VQA** feature of the RTVA, then the following configuration option are also needed:
+
+* `mediaTag`: A reserved token that designates the presence of a non-text modality within the input stream.
+* `llmMmProjModelName`: The filename corresponding to the multimodal projection model to be utilized.
+* `maxInputImageDim`: An optional integer specifying the maximum size (in pixels) of the image's longer dimension before it is processed by the projection model.
 
 ## Custom STT Configuration
 
@@ -160,7 +178,7 @@ You only need to modify the values associated with these keys if you wish to cus
 ## Resources
 
 The STT and LLM modules automatically download the required neural network models during the build process.
-These models are then deployed to the device for processing voice commands and generating responses with a [push models script](app/pushModels.py)
+These models are then deployed to the device for processing voice commands and generating responses with a [push resources script](app/pushAppResources.py)
 
 ## Tested Devices
 
@@ -172,12 +190,11 @@ The following ABIs (Application Binary Interfaces) are supported:
 
 * arm64-v8a
 * x86_64
- 
+
 ## Supported NDK Versions
 
 The application has been built and tested using the following Android NDK r25 version.
 Other versions may work but have not been officially tested.
-
 
 ## Troubleshooting
 
@@ -190,9 +207,22 @@ Other versions may work but have not been officially tested.
 
 ## Known issues
 
-
 > **NOTE**: The cancellation flow of the application is currently under testing. Further updates and improvements will follow.
 
 ## License
 
 This project is distributed under the software licenses in [LICENSES](LICENSES) directory.
+
+This project also makes use of default models for LLM (text and vision) and STT. It is the responsibility
+of the user to review and comply with the terms of each model’s license when using, modifying,
+or redistributing these models.  The corresponding models and their licenses are listed below:
+
+* LLM:
+  * llama.cpp - text:
+    * phi-2 - [mit](https://huggingface.co/microsoft/phi-2/blob/main/LICENSE)
+  * llama.cpp - vision:
+    * Qwen2-VL-2B-Instruct - [apache-2.0](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/blob/main/LICENSE)
+  * onnxruntime-genai text:
+    * Phi-4-mini-instruct - [mit](https://huggingface.co/microsoft/Phi-4-mini-instruct/blob/main/LICENSE)
+* STT:
+  * whisper - [mit](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/mit.md)

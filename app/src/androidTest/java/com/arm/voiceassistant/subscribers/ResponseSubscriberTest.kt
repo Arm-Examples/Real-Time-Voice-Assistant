@@ -19,11 +19,18 @@ import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.viewmodels.MainViewModel
 import java.util.concurrent.SubmissionPublisher
 
+/**
+ * Unit test for verifying behavior of the ResponseSubscriber,
+ * which streams LLM response tokens into the MainViewModel.
+ */
 @RunWith(MockitoJUnitRunner::class)
 class ResponseSubscriberTest {
 
     private var mainViewModel: MainViewModel? = null
 
+    /**
+     * Initializes a mocked Application context and MainViewModel before each test.
+     */
     @Before
     fun setupViewModel() {
         val application: Application = Mockito.mock(Application::class.java)
@@ -34,7 +41,12 @@ class ResponseSubscriberTest {
         mainViewModel = MainViewModel(application, true)
     }
 
-
+    /**
+     * Helper method to create a fake reactive stream publisher with predefined text tokens.
+     *
+     * @param items Vararg strings that simulate response tokens.
+     * @return A SubmissionPublisher with overridden behavior to track submissions.
+     */
     private fun createStringPublisher(vararg items: String): SubmissionPublisher<String> {
         return object : SubmissionPublisher<String>() {
             var submittedString = ""
@@ -54,6 +66,9 @@ class ResponseSubscriberTest {
         }
     }
 
+    /**
+     * Verifies that the ResponseSubscriber successfully receives and processes text from a publisher.
+     */
     @Test
     fun testSubscriber() {
         val publisher = createStringPublisher("Hello ", "how ", "are ", " you?" )

@@ -33,6 +33,7 @@ class SpeechRecorder {
 
     /**
      * Check if the recorder has been initialized
+     * @return `true` if the recorder is initialized, `false` otherwise.
      */
     fun recorderInitialized(): Boolean {
         return ::recorder.isInitialized
@@ -48,6 +49,7 @@ class SpeechRecorder {
 
     /**
      * Stop recording
+     * @param outputAudioFilePath The full path to save the recorded WAV file.
      */
     fun stopRecording(outputAudioFilePath: String) {
         recorder.stopRecording()

@@ -8,7 +8,9 @@ package com.arm.voiceassistant.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Arm branding colour palette
+/**
+ * Arm branding colour palette
+ */
 object ArmColors {
     val ArmLightBlue: Color = Color(0xFF00C1DE)
     val ArmBlue: Color = Color(0xFF0091BD)
@@ -19,4 +21,3 @@ object ArmColors {
 }
 
 val DarkBlueGray = Color(0xFF1C2932)
-

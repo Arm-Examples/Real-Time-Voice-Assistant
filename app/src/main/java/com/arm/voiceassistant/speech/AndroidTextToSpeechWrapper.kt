@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Android TTS wrapper
  * Generate the speech and save to an audio wav file to the output path parameter
+ * @param context The application context used to initialize TTS
  */
 class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
     var ttsInitialized = false
@@ -31,6 +32,11 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
         @Volatile
         private var instance: AndroidTTS? = null
 
+        /**
+         * Returns a singleton instance of [AndroidTTS].
+         * @param context Context used to initialize TTS.
+         * @return A shared instance of AndroidTTS.
+         */
         fun getInstance(context: Context): AndroidTTS {
             return instance ?: synchronized(this) {
                 instance ?: AndroidTTS(context).also { instance = it }
@@ -38,6 +44,10 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
+    /**
+     * Callback triggered when the Android TTS engine is initialized.
+     * @param status Status code indicating success or failure.
+     */
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             ttsInitialized = true
@@ -52,6 +62,9 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
     // TODO Progress listener is used to ensure speech file saving completes.
     // This requires the onDone listener to be overridden. It is only used
     // once so it may be possible to place the countdown latch in the main definition here
+    /**
+     * Sets a listener to track the progress of TTS utterances.
+     */
     private fun setOnUtteranceProgressListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) {
@@ -60,7 +73,7 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
             }
 
             override fun onDone(utteranceId: String) {
-                Log.d(Constants.VOICE_ASSISTANT_TAG, "ATTS Utterance completed: $utteranceId")
+                Log.d(Constants.VOICE_ASSISTANT_TAG, "Android TTS Utterance completed: $utteranceId")
                 ttsInProgress.set(false)
             }
 
@@ -75,6 +88,10 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
         })
     }
 
+    /**
+     * Returns whether TTS is currently speaking.
+     * @return `true` if the TTS engine is currently speaking, `false` otherwise.
+     */
     fun isSpeaking():Boolean
     {
         return ttsInProgress.get()

@@ -10,9 +10,11 @@
 
 def localLlmModelsFolder = file(project.ext.LLM_MODELS_DIR).absolutePath
 def localSttModelsFolder = file(project.ext.STT_MODELS_DIR).absolutePath
+
 def deviceFolder = file(project.ext.DEVICE_FOLDER).absolutePath
 def adbPushResourcesScript = file(project.ext.PUSH_MODELS_PY).absolutePath
 def localConfigFolder = file(project.ext.CONFIG_DIR).absolutePath
+def localImagesFolder = file(project.ext.IMAGES_DIR).absolutePath
 def llmFramework = rootProject.extensions.extraProperties.get("LLM_FRAMEWORK") as String
 
 /**
@@ -71,6 +73,16 @@ tasks.register("copyConfigsWithAdb") {
     }
 }
 
+tasks.register('copyImagesWithAdb') {
+    group = "model-sync"
+    description = "Pushes test images to device after native build"
+
+    doLast {
+        def checkDir = new File(localConfigFolder)
+        pushWithAdb(checkDir, localImagesFolder, "Test images", [])
+    }
+}
+
 // Run LLM model push after assemble task
 tasks.matching { it.name.startsWith("assemble") }.configureEach {
     finalizedBy("copyLlmModelsWithAdb")
@@ -84,4 +96,9 @@ tasks.named("copyLlmModelsWithAdb") {
 // Run config push after STT push
 tasks.named("copySttModelsWithAdb") {
     finalizedBy("copyConfigsWithAdb")
+}
+
+// Push test images if needed
+tasks.named("copyLlmModelsWithAdb") {
+    finalizedBy("copyImagesWithAdb")
 }

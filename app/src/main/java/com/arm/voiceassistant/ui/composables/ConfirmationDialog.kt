@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.semantics
 
 /**
  * Dialog to display for user choices
+ * @param modifier Layout modifier
  * @param onDismissRequest action on dismiss
  * @param onConfirmation action on confirmation
  * @param dialogText dialog question to display
@@ -55,6 +56,7 @@ fun ConfirmationDialog(
                     text = "BACK",
                     color = MaterialTheme.colorScheme.onSecondary
                 )
-            } }
+            }
+        }
     )
 }

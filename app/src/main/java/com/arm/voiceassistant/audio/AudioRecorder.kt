@@ -23,7 +23,6 @@ class AudioRecorder(private var record: AudioRecord?) {
     private var isRecording = false
     private lateinit var os: FileOutputStream
     val audioData = arrayListOf<Byte>()
-
     private var recordingThread: Thread? = null
 
     /**
@@ -39,16 +38,20 @@ class AudioRecorder(private var record: AudioRecord?) {
 
     /**
      * Writes the OutputStream to a File at the provided path
+     * @param path The file path where the WAV file should be saved.
+     * @throws RuntimeException if the file cannot be created or written.
      */
+    @Synchronized
     fun writeToFile(path: String) {
-        try {
-            os = FileOutputStream(path)
-        } catch (e: FileNotFoundException) {
-            throw RuntimeException(e)
+        val copy: ByteArray
+        synchronized(audioData) {
+            copy = audioData.toList().toByteArray()
         }
-        os.write(audioData.toByteArray())
-        os.flush()
-        os.close()
+
+        FileOutputStream(path).use { os ->
+            os.write(copy)
+            os.flush()
+        }
     }
 
     /**
@@ -68,6 +71,8 @@ class AudioRecorder(private var record: AudioRecord?) {
 
     /**
      * Convert Short to byte
+     * @param shortData The PCM short values to convert.
+     * @return The encoded byte array.
      */
     private fun shortToByte(shortData: ShortArray): ByteArray {
         val arraySize = shortData.size
@@ -103,7 +108,8 @@ class AudioRecorder(private var record: AudioRecord?) {
 
     /**
      * Set the WAV header
-     *   see: https://docs.fileformat.com/audio/wav/
+     * see: https://docs.fileformat.com/audio/wav/
+     * @return Byte array representing the WAV header.
      */
     private fun header(): ByteArray {
         val wavHeader = ByteArray(WAV_HEADER_SIZE)

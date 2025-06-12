@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.sp
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.Constants
 
-
 /**
  * Values to use for user and voice assistant's text fields
  * @property colors TextFieldColors to use
@@ -72,6 +71,12 @@ data class TextFieldStyle(
     val shape: Shape
 )
 
+/**
+ * Provides default styling for the user's text input field.
+ * @param colors Color settings for the disabled text field
+ * @param label Label to display above the field (default: "User")
+ * @param shape Shape of the text field corners
+ */
 @Composable
 fun userTextFieldDefaults(
     colors: TextFieldColors = TextFieldDefaults.colors(
@@ -84,6 +89,12 @@ fun userTextFieldDefaults(
     shape: Shape = RoundedCornerShape(0, 5, 5, 5)
 ) = TextFieldStyle(colors, label, shape)
 
+/**
+ * Provides default styling for the voice assistant's text output field.
+ * @param colors Color settings for the disabled text field
+ * @param label Label to display above the field (default: "Voice Assistant")
+ * @param shape Shape of the text field corners
+ */
 @Composable
 fun voiceAssistantTextFieldDefaults(
     colors: TextFieldColors = TextFieldDefaults.colors(
@@ -96,9 +107,19 @@ fun voiceAssistantTextFieldDefaults(
     shape: Shape = RoundedCornerShape(5, 0, 5, 5)
 ) = TextFieldStyle(colors, label, shape)
 
-
 /**
- * Text field displayed along with user icon
+ * Displays a styled text field with an optional user or assistant icon.
+ * @param modifier Optional layout modifier
+ * @param cardAspectRatio Aspect ratio for the text field card
+ * @param textFieldContentDescription Content description for accessibility
+ * @param label Label shown above the text field
+ * @param text The text content to display
+ * @param isTalking Whether the user is actively speaking
+ * @param isTranscribing Whether transcription is in progress
+ * @param playingAudio Whether audio playback is active
+ * @param isVoiceAssistant If true, displays assistant icon on the right
+ * @param shape Shape of the text field card
+ * @param colors Text field colors for background and content
  */
 @Composable
 fun ConversationText(
@@ -218,6 +239,13 @@ fun ConversationText(
 
 /**
  * User icon to display next to text field, dependent on app content state
+ * @param modifier Modifier for layout customization
+ * @param userIcon The icon to display (e.g. person or mic)
+ * @param iconColor Icon tint color
+ * @param iconSize Size of the icon inside the circle
+ * @param borderWidth Width of the circular border (0 for no border)
+ * @param borderColor Color of the border
+ * @param contentDescription Description for accessibility
  */
 @Composable
 private fun UserIcon(
@@ -253,6 +281,8 @@ private fun UserIcon(
 
 /**
  * Add speaker icon button to label for VoiceAssistant's text box
+ * @param label The label text to display (e.g. "Voice Assistant")
+ * @param playingAudio If true, shows a muted icon; otherwise a volume icon
  */
 @Composable
 private fun LabelWithSpeaker(
@@ -290,6 +320,9 @@ private fun LabelWithSpeaker(
     )
 }
 
+/**
+ * Conversation text preview
+ */
 @Preview
 @Composable
 private fun ConversationTextPreview() {

@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.TextToSpeech.QUEUE_ADD
 import android.util.Log
-import com.arm.voiceassistant.PipelineTimers
 import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Utils
@@ -44,15 +43,12 @@ class SpeechSynthesis {
             catch (e: Exception) {
                 Log.e(Constants.VOICE_ASSISTANT_TAG, "Speech Synthesizer initialization phase failed", e)
             }
-            if (androidTTS.ttsInitialized) {
-                // Initialize speech synthesis
-                Log.d(Constants.VOICE_ASSISTANT_TAG, "TTS initialized successfully")
-            } else {
-                Log.d(Constants.VOICE_ASSISTANT_TAG, "Failed TTS initialization")
-            }
         }
     }
-
+    /**
+     * Sets a custom context for testing purposes.
+     * @param testContext The mock context to use in tests.
+     */
     @TestOnly
     fun setContext(testContext: Context) {
         this.context = testContext
@@ -82,6 +78,9 @@ class SpeechSynthesis {
         }
     }
 
+    /**
+     * Blocks execution until Android TTS finishes speaking.
+     */
     private fun launchFinalize() {
         // wait for android-TTS speaking to complete
         while (androidTTS.isSpeaking()) {
@@ -90,7 +89,7 @@ class SpeechSynthesis {
     }
 
     /**
-     *
+     * Cancels ongoing speech synthesis in a thread-safe manner.
      */
     suspend fun cancelSpeechSynthesis() {
         speechSynthesisMutex.withLock {
@@ -125,6 +124,7 @@ class SpeechSynthesis {
 
     /**
      * Return true if speech synthesis has been initialized
+     * @return True if the Android TTS engine has been initialized successfully.
      */
     fun speechSynthesisInitialized(): Boolean {
         return androidTTS.ttsInitialized
@@ -133,6 +133,7 @@ class SpeechSynthesis {
 
     /**
      * Add words to speech synthesis
+     * @param tokens The new words to add to the speech response queue.
      */
     fun addWordsToSpeechSynthesis(tokens: String) {
         if (responses.isEmpty()) {
@@ -170,6 +171,7 @@ class SpeechSynthesis {
 
     /**
      * Return true if speech synthesis in progress
+     * @return True if a speech synthesis session is currently active.
      */
     fun speechSynthesisInProgress(): Boolean {
         return speechSynthesisStarted
@@ -184,6 +186,7 @@ class SpeechSynthesis {
 
     /**
      * Method to check speechSynthesis object state
+     * @return True if speech synthesis has started.
      */
     fun speechSynthesisStarted(): Boolean {
         return this.speechSynthesisStarted

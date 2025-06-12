@@ -15,6 +15,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
+/**
+ * Displays an error snackbar with optional dismiss action.
+ * @param snackbarHostState The SnackbarHostState to control the snackbar
+ * @param message The error message to show
+ * @param withDismissAction Whether to show a dismiss button
+ * @param duration Duration to show the snackbar (default: Indefinite)
+ * @param onDismiss Callback triggered when snackbar is dismissed
+ */
 @Composable
 fun ErrorSnackbar(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },

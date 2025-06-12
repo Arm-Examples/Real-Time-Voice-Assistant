@@ -11,7 +11,7 @@ val llmFramework: String = project.findProperty("llmFramework").toString()
 
 // Validate the provided framework
 require(llmFramework in validLLMFrameworks) {
-    "Invalid llmFramework: '$validLLMFrameworks'. Must be one of: ${validLLMFrameworks.joinToString()}"
+    "Invalid llmFramework specified: '$llmFramework'. Must be one of: ${validLLMFrameworks.joinToString()}"
 }
 
 // Make it available to all subprojects

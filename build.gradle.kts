@@ -30,7 +30,7 @@ subprojects {
                         arguments(
                             "-DBUILD_SHARED_LIBS=OFF",
                             "-DBUILD_JNI_LIB=ON",
-                            "-DBUILD_UNIT_TESTS=OFF",
+                            "-DBUILD_UNIT_TESTS=OFF"
                         )
 
                         //Check if KleidiAI needs to be disabled

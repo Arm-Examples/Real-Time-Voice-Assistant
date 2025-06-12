@@ -5,6 +5,7 @@
  */
 
 package com.arm.voiceassistant.viewmodels
+
 import android.app.Application
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
@@ -19,13 +20,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.mockito.junit.MockitoJUnitRunner
+
 /**
- * Testing MainViewModel functions
-*/
+ * Unit tests for [MainViewModel] to verify the correctness of
+ * error handling, UI state management, and metric toggling.
+ */
 @RunWith(MockitoJUnitRunner::class)
 class MainViewModelTest {
     private var mainViewModel: MainViewModel? = null
     private var mainUiState: StateFlow<MainUiState>? = null
+
+    /**
+     * Initializes the [MainViewModel] before each test,
+     * and sets up a mock application context.
+     */
     @Before
     fun setupViewModel() {
         val application: Application = Mockito.mock(Application::class.java)
@@ -36,12 +44,21 @@ class MainViewModelTest {
         mainViewModel = MainViewModel(application, true)
         mainUiState = mainViewModel?.uiState
     }
+
+    /**
+     * Cleans up after each test by resetting the view model and UI state.
+     */
     @After
     fun tearDown() {
         mainViewModel = null
         mainUiState = null
 
     }
+
+    /**
+     * Verifies that the initial UI state is correctly set
+     * when the view model is initialized.
+     */
     @Test
     fun testInitialState() {
         assertEquals(ContentStates.Idle, mainUiState?.value?.contentState)
@@ -54,12 +71,20 @@ class MainViewModelTest {
         assertEquals(Constants.INITIAL_METRICS_VALUE, mainUiState?.value?.llmDecodeTPS)
         assertEquals(false, mainUiState?.value?.displayPerformance)
     }
+
+    /**
+     * Verifies that [MainViewModel.onError] correctly sets the error state and message.
+     */
     @Test
     fun testOnError() {
         mainViewModel?.onError("error message")
         assertEquals(true, mainUiState?.value?.error?.state)
         assertEquals("error message", mainUiState?.value?.error?.message)
     }
+
+    /**
+     * Verifies that [MainViewModel.clearError] resets the error state and message.
+     */
     @Test
     fun testClearError() {
         testOnError()
@@ -68,6 +93,9 @@ class MainViewModelTest {
         assertEquals("", mainUiState?.value?.error?.message)
     }
 
+    /**
+     * Verifies that toggling performance metrics updates the UI state accordingly.
+     */
     @Test
     fun testTogglePerformanceMetrics() {
         assertEquals(false, mainUiState?.value?.displayPerformance)
@@ -76,5 +104,4 @@ class MainViewModelTest {
         mainViewModel?.togglePerformanceMetrics()
         assertEquals(false, mainUiState?.value?.displayPerformance)
     }
-
 }

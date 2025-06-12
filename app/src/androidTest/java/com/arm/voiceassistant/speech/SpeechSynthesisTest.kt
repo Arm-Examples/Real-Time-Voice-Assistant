@@ -17,13 +17,20 @@ import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
+/**
+ * Instrumented tests for the SpeechSynthesis class.
+ * Verifies Android Text-to-Speech (TTS) integration and behavior
+ * including start, cancellation, and progressive token-based synthesis.
+ */
 @RunWith(AndroidJUnit4::class)
 class SpeechSynthesisTest {
     private var speechSynthesis: SpeechSynthesis? = null
     private var context = InstrumentationRegistry.getInstrumentation().targetContext
-
     private lateinit var latch: CountDownLatch
 
+    /**
+     * Initializes SpeechSynthesis before each test and waits for TTS engine initialization.
+     */
     @Before
     fun setup() {
         speechSynthesis = SpeechSynthesis()
@@ -38,26 +45,36 @@ class SpeechSynthesisTest {
         ) // Wait for onInit function in SpeechSynthesis to finish executing
     }
 
+    /**
+     * Cleans up the SpeechSynthesis instance after each test.
+     */
     @After
     fun tearDown() {
         context = null
         speechSynthesis = null
     }
 
+    /**
+     * Verifies that the TTS engine is successfully initialized.
+     */
     @Test
     fun testSpeechSynthesisInitialization() {
         val initialized = speechSynthesis?.speechSynthesisInitialized()
         assertEquals(true, initialized)
     }
 
+    /**
+     * Ensures that calling startSpeechSynthesis correctly marks synthesis as in progress.
+     */
     @Test
     fun testSpeechSynthesisStarted(): Unit = runBlocking {
         speechSynthesis?.startSpeechSynthesis()
         assert(speechSynthesis?.speechSynthesisInProgress() == true)
     }
 
-
-
+    /**
+     * Validates that speech generation can be cancelled and restarted without errors.
+     */
     @Test
     fun testGenerateSpeechCancellation(): Unit = runBlocking {
         speechSynthesis?.startSpeechSynthesis()
@@ -72,6 +89,10 @@ class SpeechSynthesisTest {
         latch.await(5, TimeUnit.SECONDS)
     }
 
+    /**
+     * Tests that speech synthesis handles sentence boundaries appropriately,
+     * generating output only when a sentence is complete.
+     */
     @Test
     fun testSpeechSynthesisGenerationOnPeriodBreakOnly(): Unit = runBlocking {
         val tokens = "First sentence answer to a generation question.".split(" ")
@@ -89,5 +110,3 @@ class SpeechSynthesisTest {
         latch.await(5, TimeUnit.SECONDS)
     }
 }
-
-

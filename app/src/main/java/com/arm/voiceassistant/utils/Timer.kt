@@ -18,21 +18,33 @@ class Timer {
     private var initialTime = 0L
     var isRunning = false
 
+    /**
+     * Starts the timer by recording the current elapsed real-time.
+     */
     fun start() {
         initialTime = SystemClock.elapsedRealtime()
         isRunning = true
     }
 
+    /**
+     * Stops the timer and calculates the elapsed duration since it was started.
+     */
     fun stop() {
         duration = (SystemClock.elapsedRealtime() - initialTime)
         isRunning = false
     }
 
+    /**
+     * Resets the timer to its initial state without storing any duration.
+     */
     fun reset() {
         initialTime = 0L
         isRunning = false
     }
 
+    /**
+     * Returns the current elapsed time in milliseconds.
+     */
     val elapsedTime: Long
         get() {
             return if (isRunning) {
@@ -44,6 +56,7 @@ class Timer {
 
     /**
      * Return the elapsed time as a nice looking string.
+     * @return Formatted time string representing elapsed duration
      */
     fun format(): String {
         val seconds: Long = (elapsedTime / 1000) % 60

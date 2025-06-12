@@ -23,6 +23,8 @@ class AudioReader {
 
     /**
      * Read and convert wav data to usable format
+     * @param inputStream The input stream pointing to a WAV file.
+     * @return A [FloatArray] containing normalized PCM audio data.
      */
     fun readWavData(inputStream: InputStream): FloatArray {
         val dataLength = inputStream.available() - AudioRecorder.WAV_HEADER_SIZE
