@@ -38,7 +38,8 @@ var pipeline: Pipeline? = null
 fun TopBar(
     modifier: Modifier = Modifier,
     resetUserText: () -> Unit = {},
-    togglePerformance: () -> Unit = {}
+    togglePerformance: () -> Unit = {},
+    resetPerformanceMetrics: () -> Unit = {}
 ){
 
     CenterAlignedTopAppBar(
@@ -72,7 +73,8 @@ fun TopBar(
             IconButton(
                 onClick = {
                     pipeline?.resetContext()
-                    resetUserText() }
+                    resetUserText()
+                    resetPerformanceMetrics()}
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Cached,

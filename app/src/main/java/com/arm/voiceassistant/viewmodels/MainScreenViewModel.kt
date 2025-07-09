@@ -103,6 +103,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * Reset to default values
      */
     private fun reset() {
+        val preservePerformance = _uiState.value.displayPerformance
         _uiState.value = MainUiState(
             contentState = ContentStates.Idle,
             error = Error(),
@@ -110,7 +111,8 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             responseText = "",
             recTime = "00:00",
             recTimeMs = 0,
-            playingAudio = false
+            playingAudio = false,
+            displayPerformance = preservePerformance // Preserves display performance opened when resetting the metrics
         )
     }
 
@@ -447,6 +449,19 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun updateResponseFieldCallback(tokens: String) {
         appendResponseText(tokens)
+    }
+
+    /**
+     * Used to reset the performance metrics after the context reset
+     */
+    fun resetPerformanceMetrics() {
+        _uiState.update {
+            it.copy(
+                sttTime = INITIAL_METRICS_VALUE,
+                llmEncodeTPS = INITIAL_METRICS_VALUE,
+                llmDecodeTPS = INITIAL_METRICS_VALUE
+            )
+        }
     }
 
 }

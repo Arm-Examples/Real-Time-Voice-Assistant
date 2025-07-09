@@ -50,11 +50,12 @@ fun ScreenScaffold(
                     .background(color = MaterialTheme.colorScheme.secondary),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-		TopBar(
-		    modifier = Modifier,
-		    resetUserText = mainViewModel::resetUserText,
-		    togglePerformance = mainViewModel::togglePerformanceMetrics
-		)
+                TopBar(
+                    modifier = Modifier,
+                    resetUserText = mainViewModel::resetUserText,
+                    togglePerformance = mainViewModel::togglePerformanceMetrics,
+                    resetPerformanceMetrics = mainViewModel::resetPerformanceMetrics
+                )
             }
         },
         content = { padding ->
