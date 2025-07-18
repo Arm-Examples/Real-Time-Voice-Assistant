@@ -8,27 +8,16 @@ package com.arm.voiceassistant.ui
 
 import android.app.Application
 import android.content.Context
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.ComposeNavigator
-import androidx.navigation.testing.TestNavHostController
 import androidx.test.platform.app.InstrumentationRegistry
-import com.arm.voiceassistant.ui.composables.TopBar
-import com.arm.voiceassistant.ui.navigation.NavGraph
-import com.arm.voiceassistant.ui.navigation.Routes
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.viewmodels.MainUiState
 import com.arm.voiceassistant.viewmodels.MainViewModel
+import com.arm.voiceassistant.ScreenScaffold
 import kotlinx.coroutines.flow.StateFlow
 import org.junit.After
 import org.junit.Before
@@ -45,7 +34,6 @@ class MainScreenUITest {
     val composeTestRule = createComposeRule()
 
     private var mainViewModel: MainViewModel? = null
-    private var navController: NavHostController? = null
     private var mainUiState: StateFlow<MainUiState>? = null
 
     @Before
@@ -63,26 +51,10 @@ class MainScreenUITest {
     fun setContent() {
     composeTestRule.setContent()
     {
-        mainViewModel?.let {
-            VoiceAssistantTheme {
-                NavGraph(mainViewModel = it, startDestination = Routes.Main.route)
-            }
-            MaterialTheme {
-                Column(
-                    modifier = Modifier
-                        .background(color = MaterialTheme.colorScheme.secondary),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-
-                    navController = TestNavHostController(LocalContext.current).apply {
-                        navigatorProvider.addNavigator(ComposeNavigator())
-                    }
-                }
-                TopBar(
-                    modifier = Modifier,
-                    resetUserText = { mainViewModel!!.resetUserText() }
-                )
-            }
+        VoiceAssistantTheme {
+            ScreenScaffold(
+                mainViewModel = mainViewModel!!
+            )
         }
     }
 }

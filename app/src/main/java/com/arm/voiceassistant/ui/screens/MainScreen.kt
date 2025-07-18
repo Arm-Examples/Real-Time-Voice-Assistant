@@ -49,6 +49,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(
+    modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     state: MainUiState = MainUiState(),
     onClickStartRecording: () -> Unit = {},
@@ -90,7 +91,7 @@ fun MainScreen(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .background(color = MaterialTheme.colorScheme.primary)
     ) {
 
