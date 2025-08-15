@@ -56,7 +56,7 @@ object Utils {
         val model: ModelConfig,
         val runtime: RuntimeConfig,
         val stopWords: List<String>
-    )
+            )
 
 
     /**
@@ -66,7 +66,7 @@ object Utils {
      * @return A default-configured [UserLlmConfig] instance
      */
     fun createLlmDefaultConfig(modelPath: String, framework: String): UserLlmConfig
-    {
+        {
         var applyDefaultChatTemplate = false
         var llmMmProjModelName: String
         var isVision = true
@@ -74,10 +74,10 @@ object Utils {
         var systemTemplate = ""
         var userTemplate = ""
         var stopWords:List<String> = mutableListOf(
-            "Orbita:", "User:", "AI:", "<|user|>", "Assistant:", "user:",
+                "Orbita:", "User:", "AI:", "<|user|>", "Assistant:", "user:",
             "[end of text]", "<|endoftext|>", "model:", "Question:", "\n\n",
             "Consider the following scenario:\n", "<|im_end|>"
-        )
+            )
         var llmModelName = ""
         var modelPointer = ""
         var projPointer = ""
@@ -104,7 +104,6 @@ object Utils {
             }
             "mnn" -> {
                 llmModelName = "mnn/qwen25vl-3b/"
-                stopWords = stopWords.plus("<|im_end|>")
                 isVision = true
                 systemTemplate = "<|im_start|>system\n%s<|im_end|>"
                 userTemplate = "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
@@ -112,7 +111,7 @@ object Utils {
 
             }
         }
-        modelPointer = "$modelPath/$llmModelName"
+            modelPointer = "$modelPath/$llmModelName"
 
         //Default number of thread
         val cores = Runtime.getRuntime().availableProcessors()
@@ -121,8 +120,7 @@ object Utils {
             ChatConfig(systemPrompt,applyDefaultChatTemplate,systemTemplate,userTemplate),
             ModelConfig(modelPointer,isVision,projPointer),
             RuntimeConfig(batchSize,numThreads,contextSize),
-            stopWords,
-        )
+            stopWords)
     }
 
     fun isValidLlmConfig(file: File): Boolean {
@@ -157,7 +155,7 @@ object Utils {
      * @return An [UserLlmConfig] constructed from the file's contents
      */
     fun readLlmUserConfig(file: File, modelPath: String): JSONObject? {
-        return try {
+        try {
             val content = file.readText()
             val gson = Gson()
             val userLlmConfig: UserLlmConfig = gson.fromJson(content, UserLlmConfig::class.java)
@@ -168,23 +166,27 @@ object Utils {
             val modelObj = configJson.getJSONObject("model")
             modelObj.put("llmModelName", "$modelPath/${modelObj.getString("llmModelName")}")
 
-            if (modelObj.has("projModelName") && !modelObj.isNull("projModelName")) {
+            if (!modelObj.isNull("projModelName")) {
                 modelObj.put(
                     "projModelName",
                     "$modelPath/${modelObj.getString("projModelName")}"
                 )
-                Log.i(VOICE_ASSISTANT_TAG,modelObj.getString("projModelName"))
-
+                Log.i(VOICE_ASSISTANT_TAG, modelObj.getString("projModelName"))
             }
-            Log.d(VOICE_ASSISTANT_TAG,modelObj.getString("llmModelName"))
+
+
+            Log.d(VOICE_ASSISTANT_TAG, modelObj.getString("llmModelName"))
 
 
             configJson.put("model", modelObj)
-            configJson
+
+            return configJson
         } catch (e: Exception) {
             Log.e(VOICE_ASSISTANT_TAG, "LLM configuration invalid: Exception: $e")
-            null
         }
+
+        return null
+
     }
 
 
@@ -224,11 +226,11 @@ object Utils {
         }
     }
 
-    /**
-     * Reads a JSON file containing Whisper configuration and returns a WhisperConfig object.
+     /**
+      * Reads a JSON file containing Whisper configuration and returns a WhisperConfig object.
      * @param file The Whisper configuration file to read
      * @return A [WhisperConfig] object parsed from the JSON content
-     */
+      */
     fun readWhisperUserConfig(file: File): WhisperConfig {
         // Read the file content
         val content = file.readText()

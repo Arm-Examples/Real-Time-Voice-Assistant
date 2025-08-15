@@ -29,7 +29,7 @@ subprojects {
                     cmake {
                         arguments(
                             "-DBUILD_JNI_LIB=ON",
-                            "-DBUILD_TESTING=OFF"
+                            "-DBUILD_LLM_TESTING=OFF"
                         )
 
                         //Check if KleidiAI needs to be disabled

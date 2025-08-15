@@ -58,7 +58,7 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
     private var speechRecorder = SpeechRecorder()            // Audio recorder
     private var speechFilePath: String = ""                  // Path to the recorded audio file
     private var stt = Whisper()                              // Speech-to-text engine
-    private var llm = Llm()                                  // Language model
+    public var llm = Llm()                                  // Language model
     private var llmInitialized = false                       // Flag indicating if the LLM is initialized
     private var sttContext = 0L                              // Internal context/state for the STT engine
     private val reader = AudioReader()                       // Reads audio files
@@ -99,18 +99,18 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
 
         runCatching {
 
-            sttContext = stt.initContext("$modelPath/${Constants.STT_MODEL_NAME}")
-            val configFileWhisper = File("$modelPath/$configFileNameSTT")
-            var whisperParams = WhisperConfig()
-            if (configFileWhisper.exists()) {
-                if (isValidWhisperConfig(configFileWhisper)) {
-                    whisperParams = readWhisperUserConfig(configFileWhisper)
-                }
+                sttContext = stt.initContext("$modelPath/${Constants.STT_MODEL_NAME}")
+                val configFileWhisper = File("$modelPath/$configFileNameSTT")
+                var whisperParams = WhisperConfig()
+                if (configFileWhisper.exists()) {
+                    if (isValidWhisperConfig(configFileWhisper)) {
+                        whisperParams = readWhisperUserConfig(configFileWhisper)
+                    }
             } else {
-                whisperParams = createWhisperDefaultConfig()
-            }
-            // Initialize stt parameters
-            stt.initParameters(whisperParams)
+                    whisperParams = createWhisperDefaultConfig()
+                }
+                // Initialize stt parameters
+                stt.initParameters(whisperParams)
         }.onFailure { e ->
             val msg = "Failed to initialize STT"
             Log.e(VOICE_ASSISTANT_TAG, msg, e)
@@ -124,28 +124,28 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
      */
     private fun initializeLLM(modelPath: String) {
         runCatching {
-            // User llm config file
-            val configFile = File("$modelPath/$configFileName")
+                // User llm config file
+                val configFile = File("$modelPath/$configFileName")
             Log.d(VOICE_ASSISTANT_TAG, "LLM Config file: $modelPath/$configFileName")
 
-            if (configFile.exists()) {
+                if (configFile.exists()) {
                 runCatching {
-                    // Read and check the given llm config file
+                        // Read and check the given llm config file
                     if (isValidLlmConfig(configFile)) {
-                        // Initialize the llm with user config file
+                            // Initialize the llm with user config file
                         llm.llmInit(
                             readLlmUserConfig(configFile, modelPath).toString(),
                             sharedLibraryPath
                         )
-                        llmInitialized = true
-                    }
+                            llmInitialized = true
+                        }
                 }.onFailure { e ->
                     Log.e(
                         VOICE_ASSISTANT_TAG,
                         "Model initialization with user config phase failed. Default configs will be created",
                         e
                     )
-                }
+                    }
             } else if ((!configFile.exists()) or (!llmInitialized)) {
                 Log.w(
                     VOICE_ASSISTANT_TAG,
@@ -162,10 +162,10 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
                     Log.e(VOICE_ASSISTANT_TAG, msg, e)
                     throw RuntimeException("$msg: ${e.message}", e)
                 }
-            }
+                }
 
-            speechFilePath = "$modelPath/${Constants.RESPONSE_FILE_NAME}"
-            speechSynthesis.initSpeechSynthesis()
+                speechFilePath = "$modelPath/${Constants.RESPONSE_FILE_NAME}"
+                speechSynthesis.initSpeechSynthesis()
             // Set the pipeline for the TopBar (could not find a clean way of doing this)
             pipeline = this
 
@@ -228,13 +228,13 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
      */
     suspend fun transcribe(audioFile: String): String {
         return runCatching {
-            timers.toggleSpeechRecTimer(true)
-            val audioInputStream = FileInputStream(audioFile)
-            val audioArray: FloatArray = reader.readWavData(audioInputStream)
+        timers.toggleSpeechRecTimer(true)
+        val audioInputStream = FileInputStream(audioFile)
+        val audioArray: FloatArray = reader.readWavData(audioInputStream)
 
             val transcribed = withContext(Dispatchers.Default) {
                 stt.fullTranscribe(sttContext, audioArray)
-            }
+        }
             Utils.removeTags(transcribed)
         }.onFailure { e ->
             val msg = "Failed to transcribe your query"
@@ -242,10 +242,10 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
             throw RuntimeException(msg + e.toString())
         }.also {
             // Always stop timer, even if success/failure
-            timers.toggleSpeechRecTimer(false)
+        timers.toggleSpeechRecTimer(false)
         }.getOrElse {
             "" // Fallback to empty string if failed
-        }
+    }
     }
 
     /**
@@ -299,12 +299,10 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
     /**
      * Method sends the query to llm module and triggers Response process
      * @param query The user's input text
-     * @return The generated response from the LLM
      */
-    suspend fun generateResponse(query: String): String = withContext(Dispatchers.Default)
+    suspend fun generateResponse(query: String)
     {
-        val response: String = llm.send(query, true)
-        return@withContext response
+        llm.submit(query)
     }
 
     /**
@@ -327,13 +325,10 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
     /**
      * Wrapper Method to dispatch asynchronous query to Llm instance.
      * @param query : transcribed query string from speech
-     * @param decode : Boolean to indicate whether Llm should decode the query .
-     * If decode is false, the query would be embedded into Llm's context but Llm would not respond
      */
-    private suspend fun sendToLlm(query: String, decode: Boolean) = withContext(Dispatchers.Default) {
-        llmMutex.withLock {
-            llm.sendAsync(query, decode)   // returns only after native workers finish
-        }
+    private suspend fun sendToLlm(query: String) {
+
+        llm.submit(query)   // returns only after native workers finish
     }
 
     /**
@@ -352,8 +347,8 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
      */
     suspend fun generateResponseTokens(transcription: String) {
         lastImageEncodeJob?.join()
-        sendToLlm(transcription, decode = true)
-    }
+        sendToLlm(transcription)
+        }
 
     /**
      * Finalize speech synthesis
@@ -376,14 +371,6 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
      */
     fun speechSynthesisInProgress(): Boolean {
         return speechSynthesis.speechSynthesisInProgress()
-    }
-
-    /**
-     * Sets the subscriber responsible for receiving streamed LLM token updates.
-     * @param subscriber The [ResponseSubscriber] used to handle streaming LLM responses
-     */
-    fun setSubscriber(subscriber: ResponseSubscriber) {
-        llm.setSubscriber(subscriber)
     }
 
     fun supportsImageInput(): Boolean {
@@ -419,7 +406,7 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
 
             lastImageEncodeJob = llmScope.launch {
 
-                sendToLlm(query = "", decode = false)
+                sendToLlm(query = "")
             }
         } .onFailure { e ->
             val msg = "Failed to add image query ,Try restarting"

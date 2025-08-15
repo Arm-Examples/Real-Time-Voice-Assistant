@@ -12,11 +12,16 @@ import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.arm.Llm
 import com.arm.voiceassistant.Pipeline
 import com.arm.voiceassistant.subscribers.ResponseSubscriber
 import com.arm.voiceassistant.utils.Constants.ContentStates
 import com.arm.voiceassistant.utils.Constants.INITIAL_METRICS_VALUE
 import com.arm.voiceassistant.utils.Constants.MIN_ALLOWED_RECORDING
+import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
+import com.arm.voiceassistant.utils.Constants.EOS
+import com.arm.voiceassistant.utils.LlmBridge
+import com.arm.voiceassistant.utils.NativeResult
 import com.arm.voiceassistant.utils.Timer
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.responseComplete
@@ -26,7 +31,6 @@ import kotlinx.coroutines.Job
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.arm.voiceassistant.utils.ChatMessage
-import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,6 +106,10 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         application.applicationContext.cacheDir
     private val contentResolver = application.contentResolver
     lateinit var pipeline: Pipeline
+
+  
+    lateinit var llm: Llm
+    lateinit var llmBridge: LlmBridge
     private var timer: Timer = Timer()
     private var delayMilliseconds = 21L
     private var useAsyncLLM = true
@@ -122,7 +130,10 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             val sharedLibraryPath =
                 if (applicationInfo != null) applicationInfo.nativeLibraryDir else ""
             pipeline = Pipeline(filePath, isTest, sharedLibraryPath)
-            pipeline.setSubscriber(subscriber)
+
+            llm = pipeline.llm
+            llmBridge = LlmBridge(llm)
+
             imageUploadEnabled = pipeline.supportsImageInput()
         }
         .onFailure{ e ->
@@ -153,37 +164,37 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun onStartRecording() {
         runCatching {
-            // Reset state from previous run
+        // Reset state from previous run
             clearResponseText()
-            //clearPerformanceMetrics()
+        //clearPerformanceMetrics()
             _uiState.update { currentState ->
                 currentState.copy(
                     playingAudio = false,
                     recTimeMs = 0
                 )
             }
-            timer.reset()
+        timer.reset()
 
-            setContentState(ContentStates.Recording)
+        setContentState(ContentStates.Recording)
 
-            viewModelScope.launch {
-                pipeline.startRecording()
-            }
-            timer.start()
+        viewModelScope.launch {
+            pipeline.startRecording()
+        }
+        timer.start()
 
-            // Run timer in a coroutine
-            viewModelScope.launch {
-                while (timer.isRunning) {
-                    _uiState.update { currentState ->
-                        currentState.copy(recTime = timer.format(), recTimeMs = timer.elapsedTime)
-                    }
-                    delay(delayMilliseconds)
+        // Run timer in a coroutine
+        viewModelScope.launch {
+            while (timer.isRunning) {
+                _uiState.update { currentState ->
+                    currentState.copy(recTime = timer.format(), recTimeMs = timer.elapsedTime)
                 }
+                delay(delayMilliseconds)
             }
+        }
         }.onFailure { e ->
             Log.e(VOICE_ASSISTANT_TAG, "Recording query failed, $e")
             onError("Failed to create Audio record")
-        }
+    }
     }
 
     /**
@@ -191,19 +202,19 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     private fun stopRecording() {
         runCatching {
-            if (_uiState.value.contentState != ContentStates.Recording) {
+        if (_uiState.value.contentState != ContentStates.Recording) {
                 return@runCatching
-            }
+        }
 
-            timer.stop()
+        timer.stop()
 
-            _uiState.update { currentState ->
-                currentState.copy(recTime = "00:00", recTimeMs = timer.elapsedTime)
-            }
+        _uiState.update { currentState ->
+            currentState.copy(recTime = "00:00", recTimeMs = timer.elapsedTime)
+        }
 
-            if (pipeline.recorderInitialized()) {
-                pipeline.stopRecording("$filePath/$FILE_NAME")
-            }
+        if (pipeline.recorderInitialized()) {
+            pipeline.stopRecording("$filePath/$FILE_NAME")
+        }
         }.onFailure {e ->
             Log.e(VOICE_ASSISTANT_TAG,"Failed to create response for Prompt" ,e)
             onError("Failed to create query response, Try restarting")
@@ -236,27 +247,27 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun onStopRecording() {
         runCatching {
-            pipeline.getTimers().toggleRealTimer(start = true, dump = false)
-            if (_uiState.value.recTimeMs < MIN_ALLOWED_RECORDING) {
-                // Reset timer so that, recTimeMs does not accumulate and render this condition useless
-                timer.reset()
-                setContentState(ContentStates.Idle)
-                if (pipeline.recorderInitialized()) {
-                    pipeline.cancelRecording()
-                }
-                onError("Short recording. Please try again.")
+        pipeline.getTimers().toggleRealTimer(start = true, dump = false)
+        if (_uiState.value.recTimeMs < MIN_ALLOWED_RECORDING) {
+            // Reset timer so that, recTimeMs does not accumulate and render this condition useless
+            timer.reset()
+            setContentState(ContentStates.Idle)
+            if (pipeline.recorderInitialized()) {
+                pipeline.cancelRecording()
+            }
+            onError("Short recording. Please try again.")
                 return@runCatching
-            }
+        }
 
-            viewModelScope.launch {
-                stopRecording()
-                invokePipeline()
-            }
+        viewModelScope.launch {
+            stopRecording()
+            invokePipeline()
+        }
         }.onFailure { e ->
             Log.e(VOICE_ASSISTANT_TAG, "Failed to create Audio record and generate response", e)
             if (e.message?.contains("context is full") == true) {
                 onError("Query Encoding failed due to llm context overflow. Try resetting the context")
-            }
+    }
             else {
                 onError("Failed to create Audio record and generate response, Try restarting the voice-assistant")
             }
@@ -324,6 +335,13 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             currentState.copy( responseText = "")
         }
     }
+    /**
+     * Function to request the cancellation of a ongoing operation / functional call
+     * @param operationId associated with operation / functional call
+     */
+    fun CancelAsync() {
+        llmBridge.cancel()
+    }
 
     /**
      * Set cancelling state and cancel the running pipeline
@@ -339,7 +357,6 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             pipeline.cancelSpeechSynthesis()
         }
         else {
-            subscriber.cancel()
         }
         reset()
     }
@@ -362,8 +379,12 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         pipeline.getTimers().toggleFirstResponseTimer(start = true, dump = false)
         setUserText(transcription)
         if(useAsyncLLM) {
+            Log.i (VOICE_ASSISTANT_TAG, "Invoking LLM async")
             invokeLLMAndSSAsync()
+
+            getLlmResponse()
         } else{
+            Log.i (VOICE_ASSISTANT_TAG, "Invoking LLM sync")
             invokeLLMAndSS()
         }
     }
@@ -428,8 +449,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
 
         if (pipeline.llmInitialized()) {
             setContentState(ContentStates.Responding)
-            speechText = pipeline.generateResponse(_uiState.value.userText)
-            setResponseText(speechText)
+            pipeline.generateResponse(_uiState.value.userText)
             updateLLMTokensPerSec(pipeline.getEncodeTokensPerSec(), pipeline.getDecodeTokensPerSec())
         }
 
@@ -469,7 +489,6 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             llmResponseGenerationJob = null
         }
     }
-
     /**
      * Generate response (async)
      * @param transcription The user's transcribed input to be processed by the LLM.
@@ -478,14 +497,73 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         runCatching {
             pipeline.generateResponseTokens(transcription)
         }.onFailure { e ->
-            if ((pipeline.getChatProgress() > 85) ||  (e.message?.contains("context is full") == true)) {
+            if ((pipeline.getChatProgress() > 85) || (e.message?.contains("context is full") == true)) {
                 onError("Query Encoding failed due to llm context overflow. Try resetting the context")
-            }
-            else {
+            } else {
                 onError("Query Response phase failed . Try restarting the app")
             }
         }
     }
+
+    private suspend fun getLlmResponse() {
+
+         if (!pipeline.llmInitialized()) {
+            Log.e(VOICE_ASSISTANT_TAG, "Failed to init LLM module")
+            return
+        }
+
+        llmBridge.clearCancel()
+
+        CoroutineScope(Dispatchers.IO).launch {
+
+            var count = 0
+            var complete = false
+            do {
+                var message = ""
+                var token = ""
+                Log.i(VOICE_ASSISTANT_TAG, "Waiting on get token")
+                val result = llmBridge.getNextToken()
+                when (result) {
+                    is NativeResult.Success -> token = result.data ?: ""
+                    is NativeResult.Cancelled -> message = "Info: Sync operation cancelled"
+                    is NativeResult.Error -> message =
+                        "Error: getNextToken Failed. " + (result.message ?: "")
+                }
+
+                if (result !is NativeResult.Success) {
+                   Log.e(VOICE_ASSISTANT_TAG, message)
+                    complete = true
+                }
+
+                if (token.isEmpty()) {
+                    Log.e(VOICE_ASSISTANT_TAG, "Token returned from LLM is empty")
+                    continue
+                }
+
+                if( llm.isStopToken(token)) {
+                    Log.i(VOICE_ASSISTANT_TAG, "EOS token retrieved")
+                    complete = true
+                }
+
+                if (llmBridge.isCancelInProgress.get()) {
+                    Log.i(VOICE_ASSISTANT_TAG, "Token Generation cancelled")
+                    complete = true
+                }
+
+                launch(Dispatchers.Main) {
+                    complete = complete || Utils.responseComplete(token)
+                    if (!complete) {
+                        updateResponseFieldCallback(token)
+                    } else {
+                        token = EOS
+                    }
+                    generatedResponseCallback(token)
+                }
+            } while (count++ < 100 && complete == false )
+        }
+
+    }
+
 
     /**
      * Asynchronous handling of the LLM + SS part of the pipeline
@@ -494,12 +572,8 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         if (pipeline.llmInitialized()) {
             // Generate a response
             setContentState(ContentStates.Responding)
-            dispatchLLMResponseGenerationJob {
-                messages.add(ChatMessage.AssistantText(""))
-                generateResponseTokens(
-                    uiState.value.userText
-                )
-            }
+            messages.add(ChatMessage.AssistantText(""))
+            generateResponseTokens(uiState.value.userText)
         }
     }
 
@@ -521,11 +595,11 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      suspend fun generatedResponseCallback(tokens: String?)
     {
          runCatching {
-            if (tokens != null) {
-                if (responseComplete(tokens)) {
-                    pipeline.finalizeSpeechSynthesis()
-                    updateToIdleState()
-                    updateLLMTokensPerSec(pipeline.getEncodeTokensPerSec(), pipeline.getDecodeTokensPerSec())
+        if (tokens != null) {
+            if (responseComplete(tokens)) {
+                pipeline.finalizeSpeechSynthesis()
+                updateToIdleState()
+                updateLLMTokensPerSec(pipeline.getEncodeTokensPerSec(), pipeline.getDecodeTokensPerSec())
                     if (pipeline.getChatProgress() > 80)
                     {
                         Log.w(VOICE_ASSISTANT_TAG,"context is ${pipeline.getChatProgress()}% full")
@@ -533,16 +607,16 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
                     }
                 } else if (uiState.value.isTTSEnabled) {
                     if (!pipeline.speechSynthesisInProgress()) {
-                        pipeline.getTimers().toggleFirstResponseTimer(start = false, dump = true)
-                        pipeline.startSpeechSynthesis()
-                    }
-                    pipeline.addWordsToSpeechSynthesis(tokens)
+                    pipeline.getTimers().toggleFirstResponseTimer(start = false, dump = true)
+                    pipeline.startSpeechSynthesis()
                 }
+                pipeline.addWordsToSpeechSynthesis(tokens)
             }
+        }
         }.onFailure { e ->
             Log.e(VOICE_ASSISTANT_TAG,"Failed to generate response $e")
             onError(" Response generation failed , Try restarting .")
-        }
+    }
    }
 
     /**
@@ -556,7 +630,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     /**
      * Stop the LLM response job
      */
-    private fun cancelLLMResponseGenerationJob() {
+    fun cancelLLMResponseGenerationJob() {
         llmResponseGenerationJob?.cancel()
         llmResponseGenerationJob = null
     }
@@ -582,7 +656,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         if (lastIndex != -1) {
             val currentText = uiState.value.responseText
             messages[lastIndex] = ChatMessage.AssistantText(currentText)
-        }
+    }
     }
 
     /**
