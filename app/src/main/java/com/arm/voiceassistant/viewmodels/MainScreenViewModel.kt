@@ -111,7 +111,10 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     init {
         reset()
-        pipeline = Pipeline(filePath, isTest)
+
+        val applicationInfo  = application.applicationInfo
+        val sharedLibraryPath = if (applicationInfo != null)  applicationInfo.nativeLibraryDir else ""
+        pipeline = Pipeline(filePath, isTest, sharedLibraryPath)
         pipeline.setSubscriber(subscriber)
         imageUploadEnabled = pipeline.supportsImageInput()
     }

@@ -16,6 +16,7 @@ android {
         externalNativeBuild {
             cmake {
                 targets += listOf("arm-stt-jni")
+                arguments += "-DBUILD_SHARED_LIBS=OFF"
             }
         }
 

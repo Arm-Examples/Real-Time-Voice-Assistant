@@ -16,28 +16,33 @@ import com.arm.voiceassistant.audio.AudioReader
 import com.arm.voiceassistant.speech.SpeechRecorder
 import com.arm.voiceassistant.speech.SpeechSynthesis
 import com.arm.voiceassistant.subscribers.ResponseSubscriber
+import com.arm.voiceassistant.ui.composables.pipeline
 import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.createLlmDefaultConfig
 import com.arm.voiceassistant.utils.Utils.createWhisperDefaultConfig
 import com.arm.voiceassistant.utils.Utils.isValidLlmConfig
-import com.arm.voiceassistant.utils.Utils.readWhisperUserConfig
 import com.arm.voiceassistant.utils.Utils.isValidWhisperConfig
 import com.arm.voiceassistant.utils.Utils.readLlmUserConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import com.arm.voiceassistant.utils.Utils.readWhisperUserConfig
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
-import java.io.FileInputStream
-import java.lang.Exception
-import java.io.File
-import java.io.FileOutputStream
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.FileWriter
+
 
 /** Main processing pipeline that coordinates STT, LLM, and TTS components.
  *
@@ -47,8 +52,11 @@ import kotlinx.coroutines.SupervisorJob
  *
  * @param modelPath Path to model files used by LLM and STT engines
  * @param isTest Flag to control test behavior (e.g., for CI or mocks)
+ * @param sharedLibraryPath path to shared libraries location, this path can be used by JNI
+ *        libraries to load other shared libs
+ *
  */
-class Pipeline(modelPath: String, isTest: Boolean = false) {
+class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLibraryPath: String = "") {
     private var timers = PipelineTimers()                    // Various timers needed
     private var speechRecorder = SpeechRecorder()            // Audio recorder
     private var speechFilePath: String = ""                  // Path to the recorded audio file
@@ -59,18 +67,17 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
     private val reader = AudioReader()                       // Reads audio files
     private var speechSynthesis = SpeechSynthesis()          // Generator of speech
     private var llmFramework = BuildConfig.LLM_FRAMEWORK     // Selected llm framework
-    private val llmMutex = kotlinx.coroutines.sync.Mutex()
+    private val llmMutex = Mutex()
     @OptIn(ExperimentalCoroutinesApi::class)
     private val llmScope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
     private var lastImageEncodeJob: Job? = null
     private var isTestMode = isTest
 
-
     // User config file for llm, default is llama.cpp
     private var configFileName: String = when (llmFramework) {
         "llama.cpp" -> "llamaVisionConfigUser.json"
         "onnxruntime-genai" -> "onnxTextConfigUser.json"
-        else -> "llamaConfigUser.json"
+        else -> "llamaVisionConfigUser.json"
     }
     // User config file name stt
     private var configFileNameSTT = "whisperConfigUser.json"
@@ -79,6 +86,8 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
      * Initialize speech recognition, large language model and speech synthesis
      */
     init {
+        Log.i(VOICE_ASSISTANT_TAG,"Android Shared Library Path $sharedLibraryPath")
+
         if (!isTest) {
             initializeSTT(modelPath)
             initializeLLM(modelPath)
@@ -87,18 +96,18 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
 
     private fun initializeSTT(modelPath: String) {
         try {
-            sttContext = stt.initContext("$modelPath/${Constants.STT_MODEL_NAME}")
-            val configFileWhisper = File("$modelPath/$configFileNameSTT")
-            var whisperParams = WhisperConfig()
-            if (configFileWhisper.exists()) {
-                if (isValidWhisperConfig(configFileWhisper)) {
-                    whisperParams = readWhisperUserConfig(configFileWhisper)
+                sttContext = stt.initContext("$modelPath/${Constants.STT_MODEL_NAME}")
+                val configFileWhisper = File("$modelPath/$configFileNameSTT")
+                var whisperParams = WhisperConfig()
+                if (configFileWhisper.exists()) {
+                    if (isValidWhisperConfig(configFileWhisper)) {
+                        whisperParams = readWhisperUserConfig(configFileWhisper)
+                    }
+                } else {
+                    whisperParams = createWhisperDefaultConfig()
                 }
-            } else {
-                whisperParams = createWhisperDefaultConfig()
-            }
-            // Initialize stt parameters
-            stt.initParameters(whisperParams)
+                // Initialize stt parameters
+                stt.initParameters(whisperParams)
         } catch (e: Exception) {
             Log.e(VOICE_ASSISTANT_TAG, "Failed to initialize STT", e)
         }
@@ -108,13 +117,18 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
         try {
             // User llm config file
             val configFile = File("$modelPath/$configFileName")
+            Log.d(VOICE_ASSISTANT_TAG, "LLM Config file: $modelPath/$configFileName")
+
             if (configFile.exists()) {
+                Log.d(VOICE_ASSISTANT_TAG, "LLM Config file exists: $modelPath/$configFileName")
                 try {
                     // Read and check the given llm config file
                     if (isValidLlmConfig(configFile)) {
                         // Initialize the llm with user config file
-                        llm.llmInit(readLlmUserConfig(configFile, modelPath).toString())
-                        //llmFramework = llm.frameworkType
+                        llm.llmInit(
+                            readLlmUserConfig(configFile, modelPath).toString(),
+                            sharedLibraryPath
+                        )
                         llmInitialized = true
                     }
                 } catch (e: Exception) {
@@ -130,15 +144,21 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
                     "Missing configuration file: ${configFileName}. Default configs will be created"
                 )
             }
+
             if (!llmInitialized) {
-                // If user llm can't be initialized with user config file, initialize with the default config file
-                llm.llmInit(createLlmDefaultConfig(modelPath, llmFramework).toString())
+                val gson = GsonBuilder().create()
+                val jsonEncodedConfig =
+                    gson.toJson(createLlmDefaultConfig(modelPath, llmFramework)).toString()
+                Log.d(VOICE_ASSISTANT_TAG, "Model config:  $jsonEncodedConfig")
+
+                llm.llmInit(jsonEncodedConfig, sharedLibraryPath)
             }
+
             llmInitialized = true
             speechFilePath = "$modelPath/${Constants.RESPONSE_FILE_NAME}"
             speechSynthesis.initSpeechSynthesis()
             // Set the pipeline for the TopBar (could not find a clean way of doing this)
-            com.arm.voiceassistant.ui.composables.pipeline = this
+            pipeline = this
         } catch (e: Exception) {
             Log.e(VOICE_ASSISTANT_TAG, "Model initialization phase failed", e)
         }
@@ -356,13 +376,12 @@ class Pipeline(modelPath: String, isTest: Boolean = false) {
         if (resizedImageFile != null) {
             this.llm.setImageLocation(resizedImageFile.absolutePath)
         }
-        Log.i("tag", "file location is ${originalResImage.absolutePath}")
+        Log.i(VOICE_ASSISTANT_TAG, "file location is ${originalResImage.absolutePath}")
 
 
         lastImageEncodeJob = llmScope.launch {
             sendToLlm(query = "", decode = false)
         }
-
     }
 
     /**

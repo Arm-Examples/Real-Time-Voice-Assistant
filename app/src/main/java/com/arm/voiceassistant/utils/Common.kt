@@ -31,21 +31,32 @@ class AppContext private constructor() {
     var context: Context? = null
 }
 object Utils {
+    data class ChatConfig(
+        val systemPrompt: String,
+        val applyDefaultChatTemplate: Boolean,
+        val systemTemplate: String,
+        val userTemplate: String
+    )
+
+    data class ModelConfig(
+        val llmModelName: String,
+        val isVision: Boolean,
+        val projModelName: String? = null
+    )
+
+    data class RuntimeConfig(
+        val batchSize: Int,
+        val numThreads: Int,
+        val contextSize: Int
+    )
 
     data class UserLlmConfig(
-        val modelTag: String,
-        val userTag: String,
-        val endTag: String,
-        val llmPrefix: String,
-        val mediaTag: String,
-        val stopWords: List<String>,
-        val inputModalities : List<String>,
-        val outputModalities : List<String>,
-        val llmModelName: String,
-        val llmMmProjModelName: String,
-        val batchSize: Int,
-        val numThreads: Int
+        val chat: ChatConfig,
+        val model: ModelConfig,
+        val runtime: RuntimeConfig,
+        val stopWords: List<String>
     )
+
 
     /**
      * Creates a default [UserLlmConfig] object for the given model path and framework.
@@ -56,84 +67,68 @@ object Utils {
     fun createLlmDefaultConfig(modelPath: String, framework: String): UserLlmConfig
     {
         val llmModelName: String
+        var applyDefaultChatTemplate = false
         var llmMmProjModelName: String
-        var userTag = ""
-        var endTag = ""
+        var isVision = true
+        var systemTemplate = ""
+        var userTemplate = ""
         var stopWords:List<String> = mutableListOf(
             "Orbita:", "User:", "AI:", "<|user|>", "Assistant:", "user:",
             "[end of text]", "<|endoftext|>", "model:", "Question:", "\n\n",
-            "Consider the following scenario:\n"
+            "Consider the following scenario:\n", "<|im_end|>"
         )
-        var inputModalities:List<String> = mutableListOf()
-        var outputModalities:List<String> = mutableListOf()
-        var llmPrefix = ""
-        var modelTag = ""
+        var systemPrompt = ""
         var modelPointer = ""
-        var mediaTag = ""
+        var projPointer = ""
         var batchSize = 1
-        llmMmProjModelName = ""
-        val transcript = "Transcript of a dialog, where the User interacts with an AI Assistant named Orbita."
+        var contextSize =2048
         if (framework == "llama.cpp") {
-            llmModelName = "llama.cpp/mmModel.gguf"
-            llmMmProjModelName = "llama.cpp/mmproj.gguf"
-            llmPrefix = transcript + "Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences" + "User:"
-            modelTag = " \n Orbita:"
-            mediaTag = "<__media__>"
+            llmModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf"
+            llmMmProjModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q8_0_proj.gguf"
+            isVision = true
+            applyDefaultChatTemplate = false
+            systemPrompt = "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of four sentences."
+            systemTemplate = "<|im_start|>system\n%s<|im_end|>\n"
+            userTemplate =  "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
             batchSize = 256
-            inputModalities = listOf("text", "image")
-            outputModalities = listOf("text")
+
             modelPointer = "$modelPath/$llmModelName"
+            projPointer = "$modelPath/$llmMmProjModelName"
         }
         else if (framework == "onnxruntime-genai")
         {
-            llmModelName = "onnxruntime-genai"
+            llmModelName = "onnxruntime-genai/phi-4-mini"
             stopWords= stopWords.plus("<|end|>")
-            llmPrefix =
-                "<|system|>${transcript}Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences<|end|><|user|>"
-            modelTag = "<|assistant|>"
-            userTag = "<|user|>"
-            endTag = "<|end|>"
-            modelPointer = "$modelPath/$llmModelName"
+            isVision = false
+            applyDefaultChatTemplate = false
+            systemPrompt = "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of two sentences."
+            systemTemplate = "<|system|>%s<|end|>"
+            userTemplate =  "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
             batchSize = 1
-            inputModalities = listOf("text", "image")
-            outputModalities = listOf("text")
+            modelPointer = "$modelPath/$llmModelName"
         }
         //Default number of thread
         val cores = Runtime.getRuntime().availableProcessors()
         val numThreads = if (cores >= 8) 4 else 2
         return UserLlmConfig(
-            modelTag,
-            userTag,
-            endTag,
-            llmPrefix,
-            mediaTag,
+            ChatConfig(systemPrompt,applyDefaultChatTemplate,systemTemplate,userTemplate),
+            ModelConfig(modelPointer,isVision,projPointer),
+            RuntimeConfig(batchSize,numThreads,contextSize),
             stopWords,
-            inputModalities,
-            outputModalities,
-            modelPointer,
-            llmMmProjModelName,
-            batchSize,
-            numThreads
         )
     }
 
-    /**
-     * Check if config file is valid
-     */
     fun isValidLlmConfig(file: File): Boolean {
         return try {
             val content = file.readText()
             if (content.isBlank()) return false
             val config = Gson().fromJson(content, UserLlmConfig::class.java)
             config != null &&
-                    config.modelTag.isNotBlank() &&
-                    config.llmModelName.isNotBlank() &&
-                    config.inputModalities.isNotEmpty() &&
-                    config.outputModalities.isNotEmpty() &&
-                    config.llmPrefix.isNotBlank() &&
-                    config.stopWords.isNotEmpty() &&
-                    config.numThreads > 0 &&
-                    config.numThreads <= Runtime.getRuntime().availableProcessors()
+                    config.chat.systemPrompt.isNotBlank() &&
+                    config.model.llmModelName.isNotBlank() &&
+                    config.runtime.numThreads > 0 &&
+                    config.runtime.numThreads <= Runtime.getRuntime().availableProcessors() &&
+                    config.stopWords.isNotEmpty()
         } catch (e: JsonSyntaxException) {
             Log.e(VOICE_ASSISTANT_TAG, "Invalid configuration JSON syntax", e)
             false
@@ -142,6 +137,7 @@ object Utils {
             false
         }
     }
+
 
     /**
      * Read LLM configurations defined by User
@@ -155,19 +151,29 @@ object Utils {
             val gson = Gson()
             val userLlmConfig: UserLlmConfig = gson.fromJson(content, UserLlmConfig::class.java)
             val configJson = JSONObject(gson.toJson(userLlmConfig))
-            configJson.put("llmModelName", modelPath + "/" + configJson.getString("llmModelName"))
-            if(configJson.has("llmMmProjModelName")) {
-                configJson.put(
-                    "llmMmProjModelName",
-                    modelPath + "/" + configJson.getString("llmMmProjModelName")
-                )
+
+            // Update model paths
+            val modelJsonEncoding = configJson.getJSONObject("model")
+            val llmModelName = modelJsonEncoding.getString("llmModelName")
+            val llmModelPath = "$modelPath/$llmModelName"
+            modelJsonEncoding.put("llmModelName", llmModelPath)
+            Log.d(VOICE_ASSISTANT_TAG,modelJsonEncoding.getString("llmModelName"))
+
+            if (modelJsonEncoding.has("projModelName") && !modelJsonEncoding.isNull("projModelName")) {
+                val projModelName = modelJsonEncoding.getString("projModelName")
+                val projModelPath = "$modelPath/$projModelName"
+                modelJsonEncoding.put("projModelName", projModelPath)
+                Log.i(VOICE_ASSISTANT_TAG,"LLM model Path $projModelPath")
             }
+
+            configJson.put("model", modelJsonEncoding)
             return configJson
-        } catch (e : Exception) {
+        } catch (e: Exception) {
             Log.e(VOICE_ASSISTANT_TAG, "LLM configuration invalid: Exception: $e")
             return null
         }
     }
+
 
     /**
      * Check if config file is valid

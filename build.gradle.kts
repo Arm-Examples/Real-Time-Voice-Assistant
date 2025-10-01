@@ -28,9 +28,8 @@ subprojects {
                 externalNativeBuild {
                     cmake {
                         arguments(
-                            "-DBUILD_SHARED_LIBS=OFF",
                             "-DBUILD_JNI_LIB=ON",
-                            "-DBUILD_UNIT_TESTS=OFF"
+                            "-DBUILD_TESTING=OFF"
                         )
 
                         //Check if KleidiAI needs to be disabled

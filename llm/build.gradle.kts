@@ -16,6 +16,7 @@ android {
         externalNativeBuild {
             cmake {
                 targets += "arm-llm-jni"
+                targets += "arm-llm-jni-stage-shared-libraries"
 
                 val llmFramework = rootProject.extensions.extraProperties.get("LLM_FRAMEWORK") as String
                 logger.lifecycle("Using LLM framework: $llmFramework")

@@ -68,6 +68,20 @@ def adb_md5sum(device_path):
     except subprocess.CalledProcessError:
         return None
 
+
+def adb_delete_file(device_path):
+    """
+    Delete file on the Android device.
+
+    @param device_path: Full path to the file on the device
+    """
+    try:
+        result = subprocess.check_output(['adb', 'shell', f'rm "{device_path}"'], stderr=subprocess.DEVNULL)
+        logging.info(f"adb delete succeed: {device_path}")
+    except subprocess.CalledProcessError:
+        logging.info(f"adb delete failed: {device_path}")
+
+
 def push_file(local_path, device_path):
     """
     Push a local file to the device using `adb push`.
@@ -84,23 +98,44 @@ def push_file(local_path, device_path):
         with open(local_path, 'rb') as f:
             subprocess.run(['adb', 'shell', f'cat > "{device_path}"'], input=f.read(), check=True)
 
+
+def adb_mkdir(path):
+    logging.info(f"mkdir'ing and chowning {path}")
+    subprocess.run(['adb', 'shell', f'mkdir -p "{path}"'], check=True)
+    subprocess.run(['adb', 'shell', f'chmod +xr "{path}"'], check=True)
+
 def sync_dir(local_dir, device_dir):
     """
-    Sync files from a local directory to a device directory via ADB.
+    Recursively sync files and folders from a local directory to a device directory via ADB.
     Skips files that are already up to date (based on MD5 hash).
 
     @param local_dir:   Path to the local directory
     @param device_dir:  Destination directory on the Android device
     """
+
+
     for name in os.listdir(local_dir):
         local_path = os.path.join(local_dir, name)
         device_path = f"{device_dir}/{name}"
-        local_hash = md5sum(local_path)
-        remote_hash = adb_md5sum(device_path)
-        if local_hash != remote_hash:
-            push_file(local_path, device_path)
+
+        if os.path.isdir(local_path):
+            # Recursively sync subdirectories
+            logging.info(f"Entering directory: {local_path}")
+            adb_mkdir(device_path)
+            sync_dir(local_path, device_path)
         else:
-            logging.info(f"{name} is up to date, skipping.")
+            # Sync individual files
+            local_hash = md5sum(local_path)
+            remote_hash = adb_md5sum(device_path)
+
+            if local_hash != remote_hash:
+                logging.info(f"Updating file: {device_path}")
+                adb_delete_file(device_path)
+                push_file(local_path, device_path)
+                subprocess.run(['adb', 'shell', f'chmod +xr "{device_path}"'], check=True)
+            else:
+                logging.info(f"{device_path} is up to date, skipping.")
+
 
 def main():
     logging.basicConfig(filename="download.log", level=logging.DEBUG)
@@ -122,13 +157,7 @@ def main():
     is_llm = args.llm_framework is not None
     llm_framework = args.llm_framework
 
-    if is_llm:
-        local_dir = os.path.join(local_dir, llm_framework)
-        device_dir = os.path.join(device_dir, llm_framework)
-        subprocess.run(['adb', 'shell', f'mkdir -p "{device_dir}"'], check=True)
-        subprocess.run(['adb', 'shell', f'chmod +x "{device_dir}"'], check=True)
-    else:
-        subprocess.run(['adb', 'shell', f'mkdir -p "{device_dir}"'], check=True)
+    subprocess.run(['adb', 'shell', f'mkdir -p "{device_dir}"'], check=True)
 
     if not os.path.isdir(local_dir):
         logging.info(f"Directory does not exist: {local_dir}, skipping.")

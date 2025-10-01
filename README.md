@@ -136,28 +136,18 @@ If no value is provided, the default is used.
 > if a different framework is preferred by default.
 
 
+Details on supported LLM models can be found [here](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#supported-models).
+
 ## Custom LLM Configuration
 
-In addition to the default settings, this application allows you to provide custom configuration parameters for the LLM via a JSON-formatted file named `app/src/model_configuration_files/{LLM Framework Name}{Text or Vision}ConfigUser.json`. This file must contain the following mandatory keys:
-* `modelTag`: A string used as an identifier or tag for the model.
-* `userTag`: A string used as tag for the user.
-* `endTag`: A string used as tag to mark the end of the query.
-* `stopWords`: An array of strings. These words or tokens indicate when the LLM should stop generating text.
-* `llmModelName`: The filename of the LLM model to be used.
-* `llmPrefix`: A string acting as a prefix to the input text, typically providing context or instructions for the model.
-* `numThreads`: An integer that specifies the number of threads the LLM should use.
-* `inputModalities`: A list defining supported input modalities.
-   Example: ["text"] for text-only, or ["text", "image"] for text + vision models.
-* `outputModalities`: A list defining supported output modalities.
-   Currently, only ["text"] is supported.
+This application supports custom configuration of the LLM via a JSON-formatted file located here: `app/src/model_configuration_files/{LLM Framework Name}{Text or Vision}ConfigUser.json`. 
 
-You only need to modify the values associated with these keys if you wish to customize the LLM's behavior. Do not remove any of the keys, as they are mandatory for the configuration to work properly.
+Details on custom LLM configuration can be found in the links below:
 
-If utilizing the **VQA** feature of the RTVA, then the following configuration option are also needed:
+[Custom configuration of llama.cpp](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#llama-cpp-model)
 
-* `mediaTag`: A reserved token that designates the presence of a non-text modality within the input stream.
-* `llmMmProjModelName`: The filename corresponding to the multimodal projection model to be utilized.
-* `maxInputImageDim`: An optional integer specifying the maximum size (in pixels) of the image's longer dimension before it is processed by the projection model.
+[Custom configuration of onnxruntime-genai](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#onnxruntime-genai-model)
+
 
 ## Custom STT Configuration
 
@@ -213,16 +203,12 @@ Other versions may work but have not been officially tested.
 
 This project is distributed under the software licenses in [LICENSES](LICENSES) directory.
 
-This project also makes use of default models for LLM (text and vision) and STT. It is the responsibility
-of the user to review and comply with the terms of each model’s license when using, modifying,
-or redistributing these models.  The corresponding models and their licenses are listed below:
+This project also includes a number of other projects, please see the license sections below for additional details:
 
-* LLM:
-  * llama.cpp - text:
-    * phi-2 - [mit](https://huggingface.co/microsoft/phi-2/blob/main/LICENSE)
-  * llama.cpp - vision:
-    * Qwen2-VL-2B-Instruct - [apache-2.0](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/blob/main/LICENSE)
-  * onnxruntime-genai text:
-    * Phi-4-mini-instruct - [mit](https://huggingface.co/microsoft/Phi-4-mini-instruct/blob/main/LICENSE)
-* STT:
-  * whisper - [mit](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/mit.md)
+
+[Kleidi / kleidi-examples / Large Language Models](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#license)
+[](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#license)
+
+
+[Kleidi / kleidi-examples /Speech to Text](https://gitlab.arm.com/kleidi/kleidi-examples/speech-to-text#license)
+

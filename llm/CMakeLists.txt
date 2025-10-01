@@ -13,14 +13,8 @@ project(llm-module
 include(FetchContent)
 
 set(LLM_MODULE_GIT_URL "https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models")
-set(LLM_MODULE_GIT_SHA "8ead4561")
+set(LLM_MODULE_GIT_SHA "665fe71f04fb098c58faf2896dba8df805871236")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
-
-if(${ANDROID_ABI} STREQUAL "arm64-v8a")
-   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8.2-a+dotprod+i8mm")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8.2-a+dotprod+i8mm")
-   set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+i8mm")
-endif()
 
 FetchContent_Declare(
 llmModule
@@ -31,3 +25,20 @@ SOURCE_DIR         ${LLM_MODULE_SRC_DIR}
 
 FetchContent_MakeAvailable(llmModule)
 
+# This block of code is required to copy llama.ccp arch variant shared libraries
+# to a known location so that they can be picked up by gradle build
+# and packaged with the APK.
+# This approach may be used by other backends in future so there is not check for
+# which backend is being used.
+if (DEFINED ANDROID_ABI)
+   set(SHARED_LIBS_STAGED_DIR "${CMAKE_SOURCE_DIR}/build/staged/${ANDROID_ABI}")
+
+   add_custom_target(arm-llm-jni-stage-shared-libraries ALL
+           COMMAND ${CMAKE_COMMAND} -E echo "Staging llama.cpp arch-variant shared libs"
+           COMMAND ${CMAKE_COMMAND} -E make_directory "${SHARED_LIBS_STAGED_DIR}"
+           COMMAND ${CMAKE_COMMAND} -E copy_directory
+           "${CMAKE_BINARY_DIR}/lib" "${SHARED_LIBS_STAGED_DIR}"
+           COMMENT "Copying shared libs to ${SHARED_LIBS_STAGED_DIR}"
+   )
+   add_dependencies(arm-llm-jni-stage-shared-libraries arm-llm-jni)
+endif()

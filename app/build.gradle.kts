@@ -77,6 +77,32 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    val stagedSharedLibraryPath = project(":llm").layout.buildDirectory.dir("staged")
+    sourceSets {
+        getByName("main").jniLibs.srcDir(
+            stagedSharedLibraryPath
+        )
+    }
+}
+
+androidComponents {
+
+    onVariants { variant ->
+        val cap = variant.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        // Need to make sure that the shared libs are merged after LLM is built otherwise
+        // the libs will be built after the jni merge is complete and they won't be packaged
+        // in the APK
+        listOf("merge${cap}JniLibs", "merge${cap}JniLibFolders").forEach { mergeName ->
+            tasks.matching { it.name in setOf("merge${cap}JniLib", "merge${cap}JniLibFolders") }
+                .configureEach {
+                    dependsOn(project(":llm").tasks.named("buildCMake${cap}"))
+                }
+        }
     }
 }
 

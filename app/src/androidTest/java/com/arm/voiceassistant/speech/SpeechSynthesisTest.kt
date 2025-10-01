@@ -40,7 +40,7 @@ class SpeechSynthesisTest {
         // Due to lateinit and complexity of subclass initialization a small delay is required to ensure the A-TTS object
         // has been initialized. Empirically determined 500ms is close to the minimum requirement but 1000ms used to mitigate issues with CI etc.
         latch.await(
-            1000,
+            2000,
             TimeUnit.MILLISECONDS
         ) // Wait for onInit function in SpeechSynthesis to finish executing
     }

@@ -34,18 +34,39 @@ class UtilsTest {
     )
 
     private fun setupConfigJson() : JSONObject{
-        return JSONObject().apply {
-            put("modelTag", "Assistant")
-            put("userTag", "User:")
-            put("endTag", "<|end|>")
-            put("llmPrefix",
-                "Assistant is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences:"
-            )
-            put("stopWords", JSONArray(stopWords))
-            put("llmModelName", "custom.bin")
-            put("batchSize", 5)
-            put("numThreads", 6)
+        val json = """
+        {
+          "chat" : {
+            "systemPrompt" : "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of two sentences.",
+            "applyDefaultChatTemplate" : true,
+            "systemTemplate" : "<start_of_turn>system:%s<end_of_turn>",
+            "userTemplate"   : "\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:"
+          },
+          "model" : {
+            "llmModelName" : "mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite",
+            "isVision" : false
+          },
+          "runtime" : {
+            "batchSize"    : 256,
+            "numThreads"   : 5,
+            "contextSize"  : 2048
+          },
+          "stopWords": [
+            "Orbita:",
+            "User:",
+            "AI:",
+            "<|endoftext|>",
+            "Assistant:",
+            "user:",
+            "[end of text]",
+            "model:",
+            "Question:",
+            "<|end|>"
+          ]
         }
+        """.trimIndent()
+
+        return JSONObject(json)
     }
 
     /**
@@ -77,13 +98,14 @@ class UtilsTest {
                 "User:"
         val defaultConfig = createLlmDefaultConfig(modelPath, "llama.cpp")
 
+        assertEquals(true, defaultConfig.model.isVision)
+        assertEquals("<|im_end|>", defaultConfig.stopWords.last())
+        assertEquals("<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n", defaultConfig.chat.userTemplate)
+        assertEquals( "<|im_start|>system\n%s<|im_end|>\n", defaultConfig.chat.systemTemplate)
+        assertEquals("<|im_end|>", defaultConfig.stopWords.last())
+        assertEquals(256, defaultConfig.runtime.batchSize)
+        assertEquals("$modelPath/llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf", defaultConfig.model.llmModelName)
 
-        assertEquals(expectedLlmPrefix, defaultConfig.llmPrefix)
-        assertEquals("", defaultConfig.userTag)
-        assertEquals("", defaultConfig.endTag)
-        assertEquals(stopWords, defaultConfig.stopWords)
-        assertEquals(256, defaultConfig.batchSize)
-        assertEquals("$modelPath/llama.cpp/mmModel.gguf", defaultConfig.llmModelName)
     }
 
     /**
@@ -97,12 +119,13 @@ class UtilsTest {
                 "Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences<|end|><|user|>"
         val stopWordsOnnx = stopWords.plus("<|end|>")
 
-        assertEquals(expectedLlmPrefix, defaultConfig.llmPrefix)
-        assertEquals("<|user|>", defaultConfig.userTag)
-        assertEquals("<|end|>", defaultConfig.endTag)
-        assertEquals(stopWordsOnnx, defaultConfig.stopWords)
-        assertEquals(1, defaultConfig.batchSize)
-        assertEquals("$modelPath/onnxruntime-genai", defaultConfig.llmModelName)
+        assertEquals(false, defaultConfig.model.isVision)
+        assertEquals("<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n", defaultConfig.chat.userTemplate)
+        assertEquals("<|end|>", defaultConfig.stopWords.last())
+        assertEquals( "<|system|>%s<|end|>", defaultConfig.chat.systemTemplate)
+        assertEquals("<|end|>", defaultConfig.stopWords.last())
+        assertEquals(1, defaultConfig.runtime.batchSize)
+        assertEquals("$modelPath/onnxruntime-genai/phi-4-mini", defaultConfig.model.llmModelName)
     }
 
     @Test
@@ -117,11 +140,10 @@ class UtilsTest {
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
 
         // Structure/values
-        assertEquals("Assistant", llmConfig.modelTag)
-        assertEquals("User:", llmConfig.userTag)
-        assertEquals("<|end|>", llmConfig.endTag)
-        assertEquals(stopWords, llmConfig.stopWords)
-        assertEquals(6, llmConfig.numThreads)
+        assertEquals("$modelPath/mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite", llmConfig.model.llmModelName)
+        assertEquals("\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:", llmConfig.chat.userTemplate)
+        assertEquals("<|end|>", llmConfig.stopWords.last())
+        assertEquals(256, llmConfig.runtime.batchSize)
     }
 
     @Test
@@ -152,9 +174,8 @@ class UtilsTest {
 
         val gson = Gson()
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
-        assertEquals("Assistant", llmConfig.modelTag)
-        assertEquals("User:", llmConfig.userTag)
-        assertEquals("<|end|>", llmConfig.endTag)
+        assertEquals("$modelPath/mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite", llmConfig.model.llmModelName)
+        assertEquals("<|end|>", llmConfig.stopWords.last())
         assertFalse(cfg.toString().contains("extraParam"))
         assertFalse(cfg.toString().contains("anotherParam"))
     }
@@ -162,7 +183,7 @@ class UtilsTest {
     @Test
     fun checkRequiredFieldMissing() {
         val jsonMissingNumThreads = setupConfigJson()
-        jsonMissingNumThreads.remove("numThreads")
+        jsonMissingNumThreads.remove("runtime")
 
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
         file.writeText(jsonMissingNumThreads.toString())
@@ -173,7 +194,7 @@ class UtilsTest {
     @Test
     fun checkWrongDataTypePassedIn() {
         val configJson = setupConfigJson()
-        configJson.remove("numThreads")
+        configJson.remove("runtime")
 
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
         file.writeText(configJson.toString())

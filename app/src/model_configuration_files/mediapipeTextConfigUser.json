@@ -1,34 +1,29 @@
 {
   "chat" : {
     "systemPrompt" : "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of two sentences.",
-    "applyDefaultChatTemplate" : false,
-    "systemTemplate" : "<|system|>%s<|end|>",
-    "userTemplate"   : "<|user|>%s<|end|><|assistant|>"
+    "applyDefaultChatTemplate" : true,
+    "systemTemplate" : "<start_of_turn>system:%s<end_of_turn>",
+    "userTemplate"   : "\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:"
   },
   "model" : {
-    "llmModelName" : "onnxruntime-genai/phi-4-mini",
+    "llmModelName" : "mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite",
     "isVision" : false
   },
   "runtime" : {
-    "batchSize"    : 1,
+    "batchSize"    : 256,
     "numThreads"   : 5,
     "contextSize"  : 2048
   },
-  "stopWords" : [
+  "stopWords": [
     "Orbita:",
     "User:",
-    "User",
     "AI:",
-    "<|user|>",
+    "<|endoftext|>",
     "Assistant:",
-    "<|assistant|>",
-    "<|end|>",
     "user:",
     "[end of text]",
-    "<|endoftext|>",
-    "<eos>",
     "model:",
     "Question:",
-    "Consider the following scenario:\\n"
+    "<|end|>"
   ]
 }
