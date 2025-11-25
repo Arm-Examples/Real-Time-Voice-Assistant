@@ -67,10 +67,10 @@ object Utils {
      */
     fun createLlmDefaultConfig(modelPath: String, framework: String): UserLlmConfig
     {
-        val llmModelName: String
         var applyDefaultChatTemplate = false
         var llmMmProjModelName: String
         var isVision = true
+        val systemPrompt = "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of four sentences."
         var systemTemplate = ""
         var userTemplate = ""
         var stopWords:List<String> = mutableListOf(
@@ -78,36 +78,42 @@ object Utils {
             "[end of text]", "<|endoftext|>", "model:", "Question:", "\n\n",
             "Consider the following scenario:\n", "<|im_end|>"
         )
-        var systemPrompt = ""
+        var llmModelName = ""
         var modelPointer = ""
         var projPointer = ""
         var batchSize = 1
-        var contextSize =2048
-        if (framework == "llama.cpp") {
-            llmModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf"
-            llmMmProjModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q8_0_proj.gguf"
-            isVision = true
-            applyDefaultChatTemplate = false
-            systemPrompt = "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of four sentences."
-            systemTemplate = "<|im_start|>system\n%s<|im_end|>\n"
-            userTemplate =  "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
-            batchSize = 256
-            modelPointer = "$modelPath/$llmModelName"
-            projPointer = "$modelPath/$llmMmProjModelName"
-        }
-        else if (framework == "onnxruntime-genai")
-        {
-            llmModelName = "onnxruntime-genai/phi-4-mini"
-            stopWords= stopWords.plus("<|end|>")
-            isVision = false
-            applyDefaultChatTemplate = false
-            systemPrompt = "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of two sentences."
-            systemTemplate = "<|system|>%s<|end|>"
+        val contextSize =2048
+        when (framework) {
+            "llama.cpp" -> {
+                llmModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf"
+                llmMmProjModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q8_0_proj.gguf"
+                isVision = true
+                systemTemplate = "<|im_start|>system\n%s<|im_end|>\n"
+                userTemplate =  "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
+                batchSize = 256
+                projPointer = "$modelPath/$llmMmProjModelName"
+            }
+            "onnxruntime-genai" -> {
+                llmModelName = "onnxruntime-genai/phi-4-mini"
+                stopWords= stopWords.plus("<|end|>")
+                isVision = false
+                systemTemplate = "<|system|>%s<|end|>"
+                userTemplate =  "<|user|>%s<|end|><|assistant|>"
+                batchSize = 1
 
-            userTemplate =  "<|user|>%s<|end|><|assistant|>"
-            batchSize = 1
-            modelPointer = "$modelPath/$llmModelName"
+            }
+            "mnn" -> {
+                llmModelName = "mnn/qwen25vl-3b/"
+                stopWords = stopWords.plus("<|im_end|>")
+                isVision = true
+                systemTemplate = "<|im_start|>system\n%s<|im_end|>"
+                userTemplate = "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
+                batchSize = 1
+
+            }
         }
+        modelPointer = "$modelPath/$llmModelName"
+
         //Default number of thread
         val cores = Runtime.getRuntime().availableProcessors()
         val numThreads = if (cores >= 8) 4 else 2
@@ -127,8 +133,12 @@ object Utils {
             config != null &&
                     config.chat.systemPrompt.isNotBlank() &&
                     config.model.llmModelName.isNotBlank() &&
+                    config.chat.systemTemplate.isNotBlank() &&
+                    config.chat.userTemplate.isNotBlank() &&
                     config.runtime.numThreads > 0 &&
                     config.runtime.numThreads <= Runtime.getRuntime().availableProcessors() &&
+                    config.runtime.batchSize > 0 &&
+                    config.runtime.contextSize > 0 &&
                     config.stopWords.isNotEmpty()
         } catch (e: JsonSyntaxException) {
             Log.e(VOICE_ASSISTANT_TAG, "Invalid configuration JSON syntax", e)

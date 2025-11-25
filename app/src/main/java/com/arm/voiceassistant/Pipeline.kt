@@ -26,8 +26,6 @@ import com.arm.voiceassistant.utils.Utils.isValidLlmConfig
 import com.arm.voiceassistant.utils.Utils.isValidWhisperConfig
 import com.arm.voiceassistant.utils.Utils.readLlmUserConfig
 import com.arm.voiceassistant.utils.Utils.readWhisperUserConfig
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -76,6 +74,7 @@ class Pipeline(modelPath: String, isTest: Boolean = false, private val sharedLib
     private var configFileName: String = when (llmFramework) {
         "llama.cpp" -> "llamaVisionConfigUser.json"
         "onnxruntime-genai" -> "onnxTextConfigUser.json"
+        "mnn" -> "mnnVisionConfigUser.json"
         else -> "llamaVisionConfigUser.json"
     }
     // User config file name stt

@@ -42,7 +42,7 @@ for optimized performance on Arm® CPU.
 ## Pre-requisites
 
 1. Download and install the latest version of [Android Studio](https://developer.android.com/studio)
-2. Install the [Android NDK](https://developer.android.com/studio/projects/install-ndk). This project was tested with Android NDK r25.
+2. Install the [Android NDK](https://developer.android.com/studio/projects/install-ndk). This project was tested with Android NDK r27.
 3. Python 3 must be installed. It is used to push resources and model files to the device.
 
 ## Dependencies
@@ -127,6 +127,7 @@ time using the `llmFramework` Gradle property.
 Available options:
 * `llama.cpp` (default)
 * `onnxruntime-genai`
+* `mnn`
 
 You can specify the framework when building the app from the command line:
 > ./gradlew assembleRelease -PllmFramework=onnxruntime-genai
@@ -140,13 +141,15 @@ Details on supported LLM models can be found [here](https://gitlab.arm.com/kleid
 
 ## Custom LLM Configuration
 
-This application supports custom configuration of the LLM via a JSON-formatted file located here: `app/src/model_configuration_files/{LLM Framework Name}{Text or Vision}ConfigUser.json`. 
+This application supports custom configuration of the LLM via a JSON-formatted file located here: `app/src/model_configuration_files/{LLM Framework Name}{Text or Vision}ConfigUser.json`.
 
 Details on custom LLM configuration can be found in the links below:
 
 [Custom configuration of llama.cpp](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#llama-cpp-model)
 
 [Custom configuration of onnxruntime-genai](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#onnxruntime-genai-model)
+
+[Custom configuration of mnn](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#mnn-model)
 
 
 ## Custom STT Configuration
@@ -183,7 +186,7 @@ The following ABIs (Application Binary Interfaces) are supported:
 
 ## Supported NDK Versions
 
-The application has been built and tested using the following Android NDK r25 version.
+The application has been built and tested using the following Android NDK r27 version.
 Other versions may work but have not been officially tested.
 
 ## Troubleshooting

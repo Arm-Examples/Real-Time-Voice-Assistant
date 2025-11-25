@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-val validLLMFrameworks = listOf("llama.cpp", "onnxruntime-genai")
+val validLLMFrameworks = listOf("llama.cpp", "onnxruntime-genai", "mnn")
 
 // Get the user-defined LLM framework from CLI (-PllmFramework=...) or gradle.properties
 val llmFramework: String = project.findProperty("llmFramework").toString()

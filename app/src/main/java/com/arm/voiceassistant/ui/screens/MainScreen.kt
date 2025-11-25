@@ -253,7 +253,7 @@ fun MainScreen(
                 message = currentToast,
                 onDismiss = { currentToast = "" },
                 modifier = Modifier
-                    .align(Alignment.TopCenter) // ✅ position at the top of screen
+                    .align(Alignment.TopCenter)
             )
         }
     }
