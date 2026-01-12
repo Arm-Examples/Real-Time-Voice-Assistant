@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2024-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -27,6 +27,8 @@ class SpeechSynthesisTest {
     private var speechSynthesis: SpeechSynthesis? = null
     private var context = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var latch: CountDownLatch
+    private val initTimeoutMs = 2000L
+    private val utteranceTimeoutSeconds = 5L
 
     /**
      * Initializes SpeechSynthesis before each test and waits for TTS engine initialization.
@@ -36,13 +38,8 @@ class SpeechSynthesisTest {
         speechSynthesis = SpeechSynthesis()
         speechSynthesis?.setContext(context)
         speechSynthesis?.initSpeechSynthesis()
-        latch = CountDownLatch(1)
-        // Due to lateinit and complexity of subclass initialization a small delay is required to ensure the A-TTS object
-        // has been initialized. Empirically determined 500ms is close to the minimum requirement but 1000ms used to mitigate issues with CI etc.
-        latch.await(
-            2000,
-            TimeUnit.MILLISECONDS
-        ) // Wait for onInit function in SpeechSynthesis to finish executing
+        awaitTtsInitialization()
+        resetLatch()
     }
 
     /**
@@ -52,6 +49,27 @@ class SpeechSynthesisTest {
     fun tearDown() {
         context = null
         speechSynthesis = null
+    }
+
+    /**
+     * Reset countdown latch and wire it to Android TTS wrapper's test-only callback countdown
+     */
+    private fun resetLatch() {
+        latch = CountDownLatch(1)
+        AndroidTTS.getInstance(context).setOnUtteranceDoneCallback { latch.countDown() }
+    }
+
+    /**
+     * Poll speech synthesis initialized for up to a specified timeout time
+     */
+    private fun awaitTtsInitialization() {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < initTimeoutMs) {
+            if (speechSynthesis?.speechSynthesisInitialized() == true) {
+                return
+            }
+            Thread.sleep(50)
+        }
     }
 
     /**
@@ -78,15 +96,17 @@ class SpeechSynthesisTest {
     @Test
     fun testGenerateSpeechCancellation(): Unit = runBlocking {
         speechSynthesis?.startSpeechSynthesis()
+        resetLatch()
         speechSynthesis?.generateSpeech("First sentence answer to a question. ")
         assert(speechSynthesis?.speechSynthesisInProgress() == true)
-        latch.await(5, TimeUnit.SECONDS)
+        latch.await(utteranceTimeoutSeconds, TimeUnit.SECONDS)
         speechSynthesis?.cancelSpeechSynthesis()
 
         speechSynthesis?.startSpeechSynthesis()
+        resetLatch()
         speechSynthesis?.generateSpeech("Speaking again after cancel")
         assert(speechSynthesis?.speechSynthesisInProgress() == true)
-        latch.await(5, TimeUnit.SECONDS)
+        latch.await(utteranceTimeoutSeconds, TimeUnit.SECONDS)
     }
 
     /**
@@ -97,16 +117,18 @@ class SpeechSynthesisTest {
     fun testSpeechSynthesisGenerationOnPeriodBreakOnly(): Unit = runBlocking {
         val tokens = "First sentence answer to a generation question.".split(" ")
         speechSynthesis?.startSpeechSynthesis()
+        resetLatch()
         for(token in tokens) {
             speechSynthesis?.addWordsToSpeechSynthesis(token)
         }
 
-        latch.await(5, TimeUnit.SECONDS)
+        latch.await(utteranceTimeoutSeconds, TimeUnit.SECONDS)
         speechSynthesis?.addWordsToSpeechSynthesis(" Another")
         assert(speechSynthesis?.speechSynthesisInProgress() == true)
 
+        resetLatch()
         speechSynthesis?.addWordsToSpeechSynthesis(" sentence. Third")
         assert(speechSynthesis?.speechSynthesisInProgress() == true)
-        latch.await(5, TimeUnit.SECONDS)
+        latch.await(utteranceTimeoutSeconds, TimeUnit.SECONDS)
     }
 }

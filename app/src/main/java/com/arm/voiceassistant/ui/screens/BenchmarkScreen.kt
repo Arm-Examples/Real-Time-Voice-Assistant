@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import com.arm.voiceassistant.BuildConfig
 import com.arm.voiceassistant.ui.composables.BaseDropdown
 import com.arm.voiceassistant.ui.composables.ModelMetrics
+import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
+import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
 import com.arm.voiceassistant.utils.ToastService
 import com.arm.voiceassistant.viewmodels.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -213,6 +215,13 @@ fun BenchmarkScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if(hasSME()) {
+                        Text(
+                            text = "Note: $SME_ENABLED_THREADS_CONFIG_WARNING",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 

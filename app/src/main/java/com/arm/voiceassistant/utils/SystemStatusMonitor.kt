@@ -92,7 +92,7 @@ class SystemStatusMonitor(
      */
     fun shutdown() {
         job?.cancel()
-        (scope.coroutineContext[Job] as? Job)?.cancel()
+        (scope.coroutineContext[Job])?.cancel()
         job = null
     }
 
@@ -102,7 +102,7 @@ class SystemStatusMonitor(
      * @param x Value to be rounded.
      * @return Value truncated down to two decimal places.
      */
-    fun roundDownTo2Decimals(x: Float): Float = floor(x * 100f) / 100f
+    private fun roundDownTo2Decimals(x: Float): Float = floor(x * 100f) / 100f
 
     /**
      * Reads the current process memory usage in gigabytes.
@@ -150,7 +150,7 @@ class SystemStatusMonitor(
      * @return Thermal status value as defined by {@link PowerManager} constants.
      */
     private fun readThermalStatus(): Int {
-       var thermalStatus =  powerManager.currentThermalStatus
+       val thermalStatus =  powerManager.currentThermalStatus
        Log.d(VOICE_ASSISTANT_TAG,"Current thermal status $thermalStatus / 6")
        return thermalStatus
     }

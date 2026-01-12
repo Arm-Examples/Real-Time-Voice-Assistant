@@ -55,60 +55,6 @@ class AudioRecorderInstrumentedTest {
     }
 
     /**
-     * Converts 16-bit PCM samples to normalized floating-point samples.
-     *
-     * Values are scaled to approximately the range [-1.0, 1.0).
-     *
-     * @param x Input PCM samples as a ShortArray.
-     * @return FloatArray containing normalized samples.
-     */
-    private fun toFloat(x: ShortArray): FloatArray {
-        val y = FloatArray(x.size)
-        var i = 0
-        while (i < x.size) {
-            y[i] = x[i] / PCM_NORMALIZE
-            i++
-        }
-        return y
-    }
-
-    /**
-     * Computes the energy (sum of squares) of a float array.
-     *
-     * @param a Input signal as a FloatArray.
-     * @param n Number of samples to include from the start of the array (default: full size).
-     * @return Energy value as a Double.
-     */
-    private fun energy(a: FloatArray, n: Int = a.size): Double {
-        var sum = 0.0
-        var i = 0
-        while (i < n) {
-            val v = a[i].toDouble()
-            sum += v * v
-            i++
-        }
-        return sum
-    }
-
-    /**
-     * Computes the dot product of two float arrays.
-     *
-     * @param a First input vector.
-     * @param b Second input vector.
-     * @param n Number of elements to use (default: minimum of a.size and b.size).
-     * @return Dot product as a Double.
-     */
-    private fun dotProduct(a: FloatArray, b: FloatArray, n: Int = min(a.size, b.size)): Double {
-        var sum = 0.0
-        var i = 0
-        while (i < n) {
-            sum += (a[i] * b[i]).toDouble()
-            i++
-        }
-        return sum
-    }
-
-    /**
      * Computes the normalized cross-correlation between two PCM signals.
      *
      * Signals are first normalized to approximately [-1, 1) and then compared.
@@ -170,7 +116,6 @@ class AudioRecorderInstrumentedTest {
             Int::class.javaPrimitiveType
         )
         m.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
         return m.invoke(ar, input, src, dst) as ShortArray
     }
 

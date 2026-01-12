@@ -25,6 +25,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
+import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.atomic.AtomicReference
 
@@ -94,11 +96,11 @@ object ToastService {
         }
     }
 
-/** Call to cleanly cancel the coroutine consumer */
-fun shutdown() {
-    scope.cancel()
-    consumerStarted.set(false)
-}
+    /** Call to cleanly cancel the coroutine consumer */
+    fun shutdown() {
+        scope.cancel()
+        consumerStarted.set(false)
+    }
 }
 
 /**
@@ -207,9 +209,12 @@ object Utils {
         }
             modelPointer = "$modelPath/$llmModelName"
 
-        //Default number of thread
+        //Default number of threads
         val cores = Runtime.getRuntime().availableProcessors()
         val numThreads = if (cores >= 8) 4 else 2
+
+        ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
+
         return UserLlmConfig(
             ChatConfig(systemPrompt,applyDefaultChatTemplate,systemTemplate,userTemplate),
             ModelConfig(modelPointer,isVision,projPointer),
@@ -241,7 +246,6 @@ object Utils {
         }
     }
 
-
     /**
      * Read LLM configurations defined by User
      * @param file The user configuration file to read
@@ -265,14 +269,15 @@ object Utils {
                     "projModelName",
                     "$modelPath/${modelObj.getString("projModelName")}"
                 )
-                Log.i(VOICE_ASSISTANT_TAG, modelObj.getString("projModelName"))
+                Log.d(VOICE_ASSISTANT_TAG, modelObj.getString("projModelName"))
             }
 
 
             Log.d(VOICE_ASSISTANT_TAG, modelObj.getString("llmModelName"))
 
-
-            configJson.put("model", modelObj)
+            if(hasSME()) {
+                ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
+            }
 
             return configJson
         } catch (e: Exception) {
@@ -289,7 +294,7 @@ object Utils {
      * @param file The configuration file to validate
      * @return true if the file contains valid and non-empty JSON content, false otherwise
      */
-    fun isValidWhisperConfig(file: File): Boolean {
+    fun isValidSttConfig(file: File): Boolean {
         return try {
             // Read file contents
             val content = file.readText()
@@ -325,7 +330,7 @@ object Utils {
      * @param file The Whisper configuration file to read
      * @return A [WhisperConfig] object parsed from the JSON content
       */
-    fun readWhisperUserConfig(file: File): WhisperConfig {
+    fun readSttUserConfig(file: File): WhisperConfig {
         // Read the file content
         val content = file.readText()
         val jsonObject = JSONObject(content)
@@ -336,10 +341,11 @@ object Utils {
         val printSpecial    = jsonObject.optBoolean("printSpecial",    false)
         val translate       = jsonObject.optBoolean("translate",       false)
         val language        = jsonObject.optString("language",         "en")
-        val numThreads      = jsonObject.optInt("numThreads",          4)
+        var numThreads      = jsonObject.optInt("numThreads",          4)
         val offsetMs        = jsonObject.optInt("offsetMs",            0)
         val noContext       = jsonObject.optBoolean("noContext",       true)
         val singleSegment   = jsonObject.optBoolean("singleSegment",   false)
+
         return WhisperConfig(
             printRealtime,
             printProgress,
@@ -358,7 +364,7 @@ object Utils {
      * Create default configurations for whisper
      * @return A [WhisperConfig] populated with preset values for common use cases
      */
-    fun createWhisperDefaultConfig() : WhisperConfig
+    fun createSttDefaultConfig() : WhisperConfig
     {
         val printRealtime = true
         val printProgress = false
@@ -395,6 +401,7 @@ object Utils {
         val regex = Regex("[^\\x0-\\x7E]")
         return text.replace(regex, "")
     }
+
 
     /**
      * Remove select characters from the current string. Previous lines passed
