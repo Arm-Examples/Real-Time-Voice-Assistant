@@ -9,15 +9,19 @@ package com.arm.voiceassistant
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.arm.Llm
 import com.arm.stt.Whisper
 import com.arm.stt.WhisperConfig
 import com.arm.voiceassistant.audio.AudioReader
 import com.arm.voiceassistant.speech.SpeechRecorder
 import com.arm.voiceassistant.speech.SpeechSynthesis
-import kotlinx.coroutines.cancel
 import com.arm.voiceassistant.ui.composables.pipeline
 import com.arm.voiceassistant.utils.Constants
+import com.arm.voiceassistant.utils.Constants.LLM_INITIALIZATION_ERROR
+import com.arm.voiceassistant.utils.Constants.LLM_CONTEXT_CAPACITY_ERROR
+import com.arm.voiceassistant.utils.Constants.LLM_QUERY_EVALUATION_ERROR
+import com.arm.voiceassistant.utils.Constants.LLM_IMAGE_ADD_ERROR
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.createLlmDefaultConfig
@@ -31,6 +35,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -53,18 +59,14 @@ import java.io.FileOutputStream
  *        libraries to load other shared libs
  *
  */
-class Pipeline(
-    modelPath: String,
-    isTest: Boolean = false,
-    private val sharedLibraryPath: String = ""
-) : AutoCloseable {
+
+class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: Boolean = false, private val sharedLibraryPath: String = "") : AutoCloseable {
     private var timers = PipelineTimers()                    // Various timers needed
     private val audioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @get:androidx.annotation.VisibleForTesting
     var speechRecorder: SpeechRecorder = SpeechRecorder(audioScope)
         internal set
-
     private var speechFilePath: String = ""                  // Path to the recorded audio file
     private var stt = Whisper()                              // Speech-to-text engine
     public var llm = Llm()                                  // Language model
@@ -80,13 +82,10 @@ class Pipeline(
     private var isTestMode = isTest
 
     // User config file for llm, default is llama.cpp
-    private var configFileName: String = when (llmFramework) {
-        "llama.cpp"         -> "llamaVisionConfigUser.json"
-        "onnxruntime-genai" -> "onnxTextConfigUser.json"
-        "mnn"               -> "mnnVisionConfigUser.json"
-        "mediapipe"         -> "mediapipeTextConfigUser.json"
-        else -> "llamaVisionConfigUser.json"
-    }
+    private var configFileName: String = Utils.getLlmConfig(llmFramework)
+
+    private var pipelineErrorFlow = errorFlow
+
     // User config file name stt
     private var configFileNameSTT = "whisperConfigUser.json"
 
@@ -152,9 +151,18 @@ class Pipeline(
     }
 
     /**
+     * Method to emit error status of jobs launched form pipeline
+     * @param status error message to be displayed on toast
+     */
+    private suspend fun emitStatus(status: String) {
+        pipelineErrorFlow.emit(status)
+    }
+
+    /**
      * Method to initialize the speech transcription instance
      */
-    private fun initializeSTT(modelPath: String) {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun initializeSTT(modelPath: String) {
 
         runCatching {
 
@@ -173,7 +181,9 @@ class Pipeline(
         }.onFailure { e ->
             val msg = "Failed to initialize STT"
             Log.e(VOICE_ASSISTANT_TAG, msg, e)
-            throw RuntimeException("$msg: ${e.message}", e)
+            runBlocking {
+                emitStatus(msg)
+            }
         }
     }
 
@@ -181,57 +191,42 @@ class Pipeline(
      * Method to initialize a LLM instance in android pipeline from java.
      * @param modelPath path to llm model file or directory
      */
-    private fun initializeLLM(modelPath: String) {
-        runCatching {
-                // User llm config file
-                val configFile = File("$modelPath/$configFileName")
-            Log.d(VOICE_ASSISTANT_TAG, "LLM Config file: $modelPath/$configFileName")
-
-                if (configFile.exists()) {
-                runCatching {
-                        // Read and check the given llm config file
-                    if (isValidLlmConfig(configFile)) {
-                            // Initialize the llm with user config file
-                        llm.llmInit(
-                            readLlmUserConfig(configFile, modelPath).toString(),
-                            sharedLibraryPath
-                        )
-                            llmInitialized = true
-                        }
-                }.onFailure { e ->
-                    Log.e(
-                        VOICE_ASSISTANT_TAG,
-                        "Model initialization with user config phase failed. Default configs will be created",
-                        e
-                    )
-                    }
-            } else if ((!configFile.exists()) or (!llmInitialized)) {
-                Log.w(
-                    VOICE_ASSISTANT_TAG,
-                    "Missing configuration file: ${configFileName}. Default configs will be created"
-                )
-                runCatching {
-                    llm.llmInit(
-                        createLlmDefaultConfig(modelPath, llmFramework).toString(),
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal  fun initializeLLM(modelPath: String) {
+        val configFile = File("$modelPath/$configFileName")
+        val configurationString =
+            if (configFile.exists() && isValidLlmConfig(configFile)) {
+                readLlmUserConfig(configFile, modelPath).toString()
+            } else {
+                Log.w(VOICE_ASSISTANT_TAG, "Using default config file to initialize LLM")
+                createLlmDefaultConfig(modelPath, llmFramework).toString()
+            }
+        val initResult = runCatching {
+            llm.llmInit(
+                        configurationString,
                         sharedLibraryPath
-                    )
-                    llmInitialized = true
-                }.onFailure { e->
-                    val msg = "Failed to initialize llm from default config"
-                    Log.e(VOICE_ASSISTANT_TAG, msg, e)
-                    throw RuntimeException("$msg: ${e.message}", e)
-                }
-                }
-
-                speechFilePath = "$modelPath/${Constants.RESPONSE_FILE_NAME}"
-                speechSynthesis.initSpeechSynthesis()
+             )
+            llmInitialized = true
+            speechFilePath = "$modelPath/${Constants.RESPONSE_FILE_NAME}"
+            speechSynthesis.initSpeechSynthesis()
             // Set the pipeline for the TopBar (could not find a clean way of doing this)
             pipeline = this
-
-        }.onFailure { e ->
-            val msg = "Model initialization phase failed"
-            Log.e(VOICE_ASSISTANT_TAG, msg)
-            throw RuntimeException(msg + e.toString())
+        }
+        initResult.onFailure { e ->
+             if (configFile.exists()) {
+                 if (isValidLlmConfig(configFile)) {
+                     Log.e(VOICE_ASSISTANT_TAG, "Failed to initialize LLM using user provided config file", e)
+                 }
+             else
+                 {
+                     Log.w(VOICE_ASSISTANT_TAG, "User provided invalid config file for LLM")
+                 }
+            }
+            val msg = LLM_INITIALIZATION_ERROR
+            Log.e(VOICE_ASSISTANT_TAG, msg, e)
+            runBlocking {
+                emitStatus(msg)
+            }
         }
     }
 
@@ -290,8 +285,8 @@ class Pipeline(
             Utils.removeTags(transcribed)
         }.onFailure { e ->
             val msg = "Failed to transcribe your query"
-            Log.e(VOICE_ASSISTANT_TAG, msg)
-            throw RuntimeException(msg + e.toString())
+            Log.e(VOICE_ASSISTANT_TAG, msg, e)
+            emitStatus(msg)
         }.also {
             // Always stop timer, even if success/failure
         timers.toggleSpeechRecTimer(false)
@@ -379,8 +374,18 @@ class Pipeline(
      * @param query : transcribed query string from speech
      */
     private suspend fun sendToLlm(query: String) = withContext(Dispatchers.Default) {
-        llmMutex.withLock {
-            llm.submit(query)   // returns only after native workers finish
+        runCatching {
+            llmMutex.withLock {
+                llm.submit(query)   // returns only after native workers finish
+            }
+        }.onFailure { e ->
+            val msg = if (e.message!!.contains("context is full") or (getChatProgress() == 100)) {
+                LLM_CONTEXT_CAPACITY_ERROR
+            } else {
+                LLM_QUERY_EVALUATION_ERROR
+            }
+            emitStatus(msg)
+            Log.e(VOICE_ASSISTANT_TAG, msg, e)
         }
     }
 
@@ -458,13 +463,17 @@ class Pipeline(
 
 
             lastImageEncodeJob = llmScope.launch {
-
-                sendToLlm(query = "")
+                runCatching {
+                    sendToLlm(query = "")
+                }.onFailure { e ->
+                    val msg = "Image embedding failed"
+                    Log.e(VOICE_ASSISTANT_TAG, "$msg ${e.message}")
+                    emitStatus(msg)
+                }
             }
         } .onFailure { e ->
-            val msg = "Failed to add image query ,Try restarting"
-            Log.e(VOICE_ASSISTANT_TAG, msg)
-            throw RuntimeException(msg + e.toString())
+            Log.e(VOICE_ASSISTANT_TAG, LLM_IMAGE_ADD_ERROR, e)
+            throw RuntimeException(LLM_IMAGE_ADD_ERROR)
         }
 
     }

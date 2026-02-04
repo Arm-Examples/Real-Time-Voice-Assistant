@@ -116,7 +116,7 @@ fun MainScreen(
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.onStartRecording()
-        else viewModel.onError("Need to grant permission to record!")
+        else viewModel.onError(Constants.RECORD_PERMISSION_ERROR)
     }
 
     val background = if (isSystemInDarkTheme()) {

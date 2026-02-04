@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2024-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -391,5 +391,21 @@ object Utils {
     fun responseComplete(token: String) : Boolean {
         return token.contains(Constants.EOS, true) ||
                 token.contains(Constants.NEXT_MESSAGE, true)
+    }
+
+    /**
+     * Retrieves the config file for given the llmFramework
+     * @param llmFramework The execution framework used to run the llm model
+     * @return Filename of user provided configurations file for the framework
+     */
+    fun getLlmConfig(llmFramework: String):String
+    {
+        return when (llmFramework) {
+            "llama.cpp" -> "llamaVisionConfigUser.json"
+            "onnxruntime-genai" -> "onnxTextConfigUser.json"
+            "mnn" -> "mnnVisionConfigUser.json"
+            "mediapipe" -> "mediapipeTextConfigUser.json"
+            else -> "llamaVisionConfigUser.json"
+        }
     }
 }

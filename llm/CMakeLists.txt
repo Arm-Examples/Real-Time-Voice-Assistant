@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+# SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -13,7 +13,7 @@ project(llm-module
 include(FetchContent)
 
 set(LLM_MODULE_GIT_URL "https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models")
-set(LLM_MODULE_GIT_SHA "2957120e5d4024f070e39abb517d52e2a9be99d7")
+set(LLM_MODULE_GIT_SHA "8e0e5a886196d278d838e06736be7f1910704939")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
 
 FetchContent_Declare(
