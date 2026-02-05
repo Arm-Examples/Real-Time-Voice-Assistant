@@ -11,10 +11,95 @@ import com.arm.stt.WhisperConfig
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
-import kotlin.concurrent.Volatile
 import java.io.File
 import org.json.JSONObject
-import java.util.Objects.toString
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import java.util.concurrent.BlockingQueue
+import java.util.concurrent.LinkedBlockingQueue
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import kotlinx.coroutines.CancellationException
+import java.util.concurrent.atomic.AtomicReference
+
+/**
+ * Global Toast Service which can be used to display messages to user from anywhere in the application
+ */
+object ToastService {
+    @Volatile
+    private var appContext: Context? = null
+    private val queue: BlockingQueue<String> = LinkedBlockingQueue(10)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    var testInterceptor: ((String) -> Unit)? = null
+    private data class LastToast(val msg: String, val timeMs: Long)
+    private val lastToast = AtomicReference<LastToast?>(null)
+    private val consumerStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    fun initialize(context: Context) {
+        appContext = context.applicationContext
+        if (consumerStarted.compareAndSet(false, true)) {
+            startConsumer()
+        }
+    }
+
+    /** Enqueue a toast message to be displayed */
+    fun showToast(message: String) {
+        if (appContext == null) {
+            Log.w("ToastService", "ToastService not initialized. Dropping toast: \"$message\"")
+            return
+        }
+        if (message.isBlank()) return
+
+        val now = System.currentTimeMillis()
+
+        while (true) {
+            val prev = lastToast.get()
+            if (prev != null && prev.msg == message && now - prev.timeMs < 2000) {
+                Log.d("ToastService", "Duplicate toast suppressed within 2s: $message")
+                return
+            }
+            val next = LastToast(message, now)
+            if (lastToast.compareAndSet(prev, next)) break
+        }
+
+        testInterceptor?.invoke(message)
+        // Avoid blocking in the event toast queue is full
+        if (!queue.offer(message)) {
+            Log.w("ToastService", "Toast queue full; dropping toast: \"$message\"")
+        }
+    }
+
+
+    /** Display the next toast in the queue (called on main thread) */
+    private fun startConsumer() {
+        scope.launch {
+            try {
+                while (isActive) {
+                    val msg = queue.take()
+                    mainHandler.post {
+                        appContext?.let { Toast.makeText(it, msg, Toast.LENGTH_SHORT).show() }
+                    }
+                    delay(3_000)
+                }
+            } catch (_: CancellationException) {
+                // normal shutdown
+            }
+        }
+    }
+
+/** Call to cleanly cancel the coroutine consumer */
+fun shutdown() {
+    scope.cancel()
+    consumerStarted.set(false)
+}
+}
 
 /**
  * Container for the context which is needed by one of the LLMs

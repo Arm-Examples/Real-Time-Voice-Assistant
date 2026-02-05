@@ -39,6 +39,10 @@ object Constants {
     const val LLM_DECODE_ERROR = "Failed to decode Llm."
     const val PIPELINE_INIT_ERROR = "Failed to initialize the Voice assistant pipeline, Check configs and models"
     const val RESPONSE_JOB_IN_PROGRESS_ERROR = "Cannot start another response job before ending the current"
-    const val RECORD_PERMISSION_ERROR = "Need to grant permission to record!"
     const val MODEL_NOT_FOUND_ERROR = "Could not find a model for \"%s\""
+    const val RECORD_PERMISSION_ERROR = "Need to grant permission to record!"
+    const val AUD_REC_START_FAILED = "Unable to start recording. Please try again."
+    const val AUD_REC_INPUT_ERROR = "Audio input error. Please retry."
+    const val AUD_REC_SAVE_FAILED = "Failed to save audio recording."
+
 }

@@ -14,7 +14,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,7 +23,10 @@ import androidx.compose.ui.Modifier
 
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.AppContext
+import com.arm.voiceassistant.utils.Constants
+import com.arm.voiceassistant.utils.ToastService
 import com.arm.voiceassistant.viewmodels.MainViewModel
+
 
 /**
  * Main activity referenced in AndroidManifest.xml which sets up the screens
@@ -67,6 +69,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     // Save the context
                     AppContext.getInstance().context = this
+                    // Initialize toast
+                    ToastService.initialize(AppContext.getInstance().context!!)
 
                     // Build the screen and return the mainViewModel for post init
                     // Pass imageUploadAction composable
@@ -106,7 +110,7 @@ class MainActivity : ComponentActivity() {
                 .show()
         } else {
             // Show a message explaining why the permissions are needed
-            Toast.makeText(this, "Permissions are required for the app to function properly.", Toast.LENGTH_LONG).show()
+            ToastService.showToast(Constants.RECORD_PERMISSION_ERROR)
         }
     }
 }

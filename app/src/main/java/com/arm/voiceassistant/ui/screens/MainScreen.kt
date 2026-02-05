@@ -234,16 +234,6 @@ fun MainScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
             }
-
-            if (currentToast.isNotEmpty()) {
-                TopToast(
-                    message = currentToast,
-                    onDismiss = { currentToast = "" },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 8.dp)
-                )
-            }
         }
     }
 }

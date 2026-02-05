@@ -37,6 +37,7 @@ import com.arm.voiceassistant.utils.Timer
 import com.arm.voiceassistant.utils.TimingStats
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.responseComplete
+import com.arm.voiceassistant.utils.ToastService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -494,8 +495,9 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * @param message : Warning message to show in toast
      */
     fun showToast(message: String) {
-        _toastMessages.tryEmit(message)
+        ToastService.showToast(message)
     }
+
 
     /**
      * Update the current content state

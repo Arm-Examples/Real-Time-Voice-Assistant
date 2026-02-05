@@ -15,8 +15,9 @@ import kotlin.math.floor
 import java.io.FileOutputStream
 import java.io.IOException
 import android.util.Log
+import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
-
+import com.arm.voiceassistant.utils.ToastService
 
 /**
  * Class to record audio to WAV format.
@@ -55,6 +56,7 @@ class AudioRecorder(
     fun startRecording() {
         if (record == null || record?.state != AudioRecord.STATE_INITIALIZED) {
             Log.d(VOICE_ASSISTANT_TAG, "AudioRecord not initialized or already released; cannot start recording")
+            ToastService.showToast(Constants.AUD_REC_START_FAILED)
             return
         }
 
@@ -85,6 +87,7 @@ class AudioRecorder(
                     val numShorts = currentRecordState.read(shortBuffer, 0, shortBuffer.size)
                     if (numShorts < 0) {
                         Log.d(VOICE_ASSISTANT_TAG, "AudioRecord.read() returned error code $numShorts; stopping recording loop")
+                        ToastService.showToast(Constants.AUD_REC_INPUT_ERROR)
                         break
                     }
                     if (numShorts > 0) {
@@ -225,9 +228,8 @@ class AudioRecorder(
             }
         } catch (e: IOException) {
             // Wrap I/O errors in a runtime exception to indicate failure
-            // ToDo Rewire to pass this up and wrap in stopRecording or similar then display message in UI as currently it will crash the app
             Log.e(VOICE_ASSISTANT_TAG, "Recording failed: ${e.message}", e)
-            throw RuntimeException("Failed to write WAV file: ${e.message}", e)
+            ToastService.showToast(Constants.AUD_REC_SAVE_FAILED)
         }
     }
 
