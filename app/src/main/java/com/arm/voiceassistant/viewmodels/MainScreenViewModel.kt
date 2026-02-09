@@ -153,6 +153,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * @param modelKey Logical model name selected in the UI.
      * @param inputTokens Number of input tokens for the synthetic prompt.
      * @param outputTokens Number of tokens to generate during decode.
+     * @param contextSize Context length in tokens (must exceed input + output tokens).
      * @param threads Number of runtime threads to use.
      * @param iterations Number of measured benchmark iterations.
      * @param warmup Number of warm-up iterations (excluded from stats).
@@ -170,7 +171,15 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         warmup: Int
     ): String = benchmarkMutex.withLock {
         withContext(Dispatchers.IO) {
-            val code = runBenchmark(modelKey, inputTokens, outputTokens, contextSize, threads, iterations, warmup)
+            val code = runBenchmark(
+                modelKey,
+                inputTokens,
+                outputTokens,
+                contextSize,
+                threads,
+                iterations,
+                warmup
+            )
             val results = getBenchmarkResults()
             if (code == 0) results else "Benchmark failed (code=$code)\n$results"
         }
@@ -320,6 +329,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * @param modelKey Logical model name from UI (e.g. "llama-3.2", "phi-2").
      * @param inputTokens Number of input tokens for the synthetic prompt.
      * @param outputTokens Number of tokens to generate during decode.
+     * @param contextSize Context length in tokens (must exceed input + output tokens).
      * @param threads Number of threads to use in the backend runtime.
      * @param iterations Number of measured iterations.
      * @param warmup Number of warm-up iterations (ignored in stats).

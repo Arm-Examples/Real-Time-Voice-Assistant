@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.arm.voiceassistant.BuildConfig
 import com.arm.voiceassistant.ui.composables.BaseDropdown
 import com.arm.voiceassistant.ui.composables.ModelMetrics
+import com.arm.voiceassistant.utils.ToastService
 import com.arm.voiceassistant.viewmodels.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -76,8 +77,8 @@ fun BenchmarkScreen(
     val cpuCount = remember { Runtime.getRuntime().availableProcessors() }
     val inputSizes = listOf(64, 128, 256, 512)
     val outputSizes = listOf(64, 128, 256, 512)
+    val contextSizes = listOf(256, 512, 1024, 2048, 4096)
     val iterationOptions = listOf(1, 3, 5, 10, 20)
-    val contextSizeOptions = listOf(1024, 2048, 3072, 4096)
     val warmupIteration = (0..5).toList()
     val threadOptions = remember { (1..cpuCount).toList() }
 
@@ -140,6 +141,29 @@ fun BenchmarkScreen(
     var isRunning by remember { mutableStateOf(false) }
     var lastRunSummary by remember { mutableStateOf<String?>(null) }
     var lastRunTitle by remember { mutableStateOf<String?>(null) }
+    fun coerceContextSize(
+        inputSize: Int,
+        outputSize: Int,
+        preferredContextSize: Int = selectedContextSize,
+    ): Int {
+        val minimumValidContextSize = inputSize + outputSize + 1
+        return contextSizes.firstOrNull { it >= minimumValidContextSize && it >= preferredContextSize }
+            ?: contextSizes.first { it >= minimumValidContextSize }
+    }
+    fun updateContextSizeIfNeeded(inputSize: Int, outputSize: Int) {
+        val newContextSize = coerceContextSize(
+            inputSize = inputSize,
+            outputSize = outputSize
+        )
+
+        if (newContextSize != selectedContextSize) {
+            selectedContextSize = newContextSize
+            ToastService.showToast("Context size updated to minimum valid value ($newContextSize).")
+        }
+    }
+    val isContextSizeOptionEnabled: (Int) -> Boolean = { contextSize ->
+        contextSize > (selectedInputSize + selectedOutputSize)
+    }
 
     Scaffold(
         modifier = modifier
@@ -235,8 +259,16 @@ fun BenchmarkScreen(
                                 label = "Input tokens",
                                 options = inputSizes,
                                 selected = selectedInputSize,
-                                onSelected = { selectedInputSize = it },
-                                enabled = !isRunning
+                                onSelected = {
+                                    selectedInputSize = it
+                                    updateContextSizeIfNeeded(
+                                        inputSize = it,
+                                        outputSize = selectedOutputSize
+                                    )
+                                },
+                                enabled = !isRunning,
+                                fieldTag = "benchmark_input_dropdown",
+                                optionTag = { "benchmark_input_option_$it" }
                             )
                         }
 
@@ -245,8 +277,16 @@ fun BenchmarkScreen(
                                 label = "Output tokens",
                                 options = outputSizes,
                                 selected = selectedOutputSize,
-                                onSelected = { selectedOutputSize = it },
-                                enabled = !isRunning
+                                onSelected = {
+                                    selectedOutputSize = it
+                                    updateContextSizeIfNeeded(
+                                        inputSize = selectedInputSize,
+                                        outputSize = it
+                                    )
+                                },
+                                enabled = !isRunning,
+                                fieldTag = "benchmark_output_dropdown",
+                                optionTag = { "benchmark_output_option_$it" }
                             )
                         }
                     }
@@ -255,6 +295,18 @@ fun BenchmarkScreen(
                         modifier = twoColumnRowModifier,
                         horizontalArrangement = twoColumnRowSpacing
                     ) {
+                        Box(Modifier.weight(1f)) {
+                            BaseDropdown(
+                                label = "Context size",
+                                options = contextSizes,
+                                selected = selectedContextSize,
+                                onSelected = { selectedContextSize = it },
+                                enabled = !isRunning,
+                                fieldTag = "benchmark_context_dropdown",
+                                optionEnabled = isContextSizeOptionEnabled,
+                                optionTag = { "benchmark_context_option_$it" }
+                            )
+                        }
                         Box(Modifier.weight(1f)) {
                             BaseDropdown(
                                 label = "Threads",
@@ -264,6 +316,12 @@ fun BenchmarkScreen(
                                 enabled = !isRunning
                             )
                         }
+                    }
+
+                    Row(
+                        modifier = twoColumnRowModifier,
+                        horizontalArrangement = twoColumnRowSpacing
+                    ) {
                         Box(Modifier.weight(1f)) {
                             BaseDropdown(
                                 label = "Iterations",
@@ -273,27 +331,12 @@ fun BenchmarkScreen(
                                 enabled = !isRunning
                             )
                         }
-                    }
-
-                    Row(
-                        modifier = twoColumnRowModifier,
-                        horizontalArrangement = twoColumnRowSpacing
-                    ) {
                         Box(Modifier.weight(1f)) {
                             BaseDropdown(
                                 label = "Warmup",
                                 options = warmupIteration,
                                 selected = selectedWarmup,
                                 onSelected = { selectedWarmup = it },
-                                enabled = !isRunning
-                            )
-                        }
-                        Box(Modifier.weight(1f)) {
-                            BaseDropdown(
-                                label = "ContextSize",
-                                options = contextSizeOptions,
-                                selected = selectedContextSize,
-                                onSelected = { selectedContextSize = it },
                                 enabled = !isRunning
                             )
                         }
@@ -332,7 +375,7 @@ fun BenchmarkScreen(
                                     isRunning = true
                                     lastRunSummary = null
                                     lastRunTitle =
-                                        "Model: $selectedModel • In:$selectedInputSize Out:$selectedOutputSize • Threads:$selectedThreads • Iter:$selectedIterations • Warm:$selectedWarmup"
+                                        "Model: $selectedModel • In:$selectedInputSize Out:$selectedOutputSize Ctx:$selectedContextSize • Threads:$selectedThreads • Iter:$selectedIterations • Warm:$selectedWarmup"
 
                                     try {
                                         val summary = withContext(Dispatchers.IO) {

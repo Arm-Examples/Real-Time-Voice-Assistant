@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 
 /**
@@ -26,6 +27,9 @@ import androidx.compose.ui.text.style.TextOverflow
  * @param enabled Whether the dropdown is interactive
  * @param valueText Text shown for the currently selected value
  * @param itemText Text shown for each dropdown item
+ * @param fieldTag Optional test tag for the dropdown field
+ * @param optionEnabled Whether an individual option is selectable
+ * @param optionTag Optional test tag for each dropdown item
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +42,9 @@ fun <T> BaseDropdown(
     enabled: Boolean = true,
     valueText: (T) -> String = { it.toString() },
     itemText: (T) -> String = { it.toString() },
+    fieldTag: String? = null,
+    optionEnabled: (T) -> Boolean = { true },
+    optionTag: ((T) -> String)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -57,6 +64,7 @@ fun <T> BaseDropdown(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth()
+                .then(fieldTag?.let { Modifier.testTag(it) } ?: Modifier)
         )
 
         ExposedDropdownMenu(
@@ -64,6 +72,7 @@ fun <T> BaseDropdown(
             onDismissRequest = { expanded = false }
         ) {
             options.forEach { opt ->
+                val isOptionEnabled = optionEnabled(opt)
                 DropdownMenuItem(
                     text = {
                         Text(
@@ -72,6 +81,8 @@ fun <T> BaseDropdown(
                             overflow = TextOverflow.Ellipsis
                         )
                     },
+                    enabled = isOptionEnabled,
+                    modifier = optionTag?.let { Modifier.testTag(it(opt)) } ?: Modifier,
                     onClick = {
                         onSelected(opt)
                         expanded = false
