@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -22,8 +22,7 @@ subprojects {
             defaultConfig {
                 minSdk = 33
 
-                //Set the minimum version for NDK, onnxruntime needs min:r27
-                ndkVersion = "27.0.12077973"
+                ndkVersion = "29.0.14206865"
 
                 externalNativeBuild {
                     cmake {

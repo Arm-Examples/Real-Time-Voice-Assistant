@@ -16,12 +16,6 @@ set(STT_MODULE_GIT_URL "https://github.com/Arm-Examples/STT-Runner.git")
 set(STT_MODULE_GIT_SHA "ac3e43d201553c8f3e51ce8347879aa0ca843826")
 set(STT_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/stt-src")
 
-if(${ANDROID_ABI} STREQUAL "arm64-v8a")
-   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8.2-a+dotprod+i8mm+fp16")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8.2-a+dotprod+i8mm+fp16")
-   set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+i8mm+fp16")
-endif()
-
 FetchContent_Declare(
         sttModule
         GIT_REPOSITORY     ${STT_MODULE_GIT_URL}
@@ -30,3 +24,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sttModule)
 
+# This block of code is required to copy whisper.ccp shared libraries
+# to a known location so that they can be picked up by gradle build
+# and packaged with the APK.
+set(SHARED_LIBS_STAGED_DIR "${CMAKE_SOURCE_DIR}/build/staged/${ANDROID_ABI}")
+add_custom_target(arm-stt-jni-stage-shared-libraries ALL
+        COMMAND ${CMAKE_COMMAND} -E echo "Staging whisper.cpp shared libs"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${SHARED_LIBS_STAGED_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/lib" "${SHARED_LIBS_STAGED_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_BINARY_DIR}/bin/*.so"
+        "${SHARED_LIBS_STAGED_DIR}"
+        COMMENT "Copying shared libs to ${SHARED_LIBS_STAGED_DIR}"
+)
+add_dependencies(arm-stt-jni-stage-shared-libraries arm-stt-jni)
+
+find_package(OpenMP REQUIRED)
+target_link_libraries(arm-stt-jni PRIVATE OpenMP::OpenMP_CXX)
