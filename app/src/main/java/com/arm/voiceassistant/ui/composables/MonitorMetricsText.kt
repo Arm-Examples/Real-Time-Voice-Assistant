@@ -126,6 +126,31 @@ fun ThermalStatusText(
 }
 
 /**
+ * Displays the current battery level as a percentage label.
+ *
+ * @param textStyle Style applied to the rendered text
+ * @param modifier Optional modifier applied to the Text (e.g. test tags)
+ * @param intervalSeconds Polling interval (in seconds) used to refresh the battery metric
+ */
+@Composable
+fun BatteryPercentageText(
+    textStyle: TextStyle = TextStyle(),
+    modifier: Modifier = Modifier,
+    intervalSeconds: Long = 3L
+) {
+    val context = LocalContext.current
+    val monitor = systemMetricsMonitor(context, intervalSeconds)
+
+    val batteryPercentage by monitor.batteryPercentage.collectAsState()
+
+    Text(
+        text = "$batteryPercentage%",
+        style = textStyle,
+        modifier = modifier
+    )
+}
+
+/**
  * Converts a [PowerManager] thermal status constant into a user-friendly description.
  *
  * @param status Thermal status value, typically one of [PowerManager.THERMAL_STATUS_NONE],

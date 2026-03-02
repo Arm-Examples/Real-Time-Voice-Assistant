@@ -92,6 +92,10 @@ class BenchmarkScreenUITest {
 
         composeTestRule.onNodeWithTag("benchmark_run_header").assertExists()
         runButton().assertExists()
+        composeTestRule.onNodeWithTag("metric_battery").assertExists()
+        composeTestRule.onNodeWithTag("metric_memory_available").assertExists()
+        composeTestRule.onNodeWithTag("metric_memory_used").assertExists()
+        composeTestRule.onNodeWithTag("metric_thermal").assertExists()
     }
 
     /**

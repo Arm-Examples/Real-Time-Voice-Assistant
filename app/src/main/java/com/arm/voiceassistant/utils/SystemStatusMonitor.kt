@@ -8,6 +8,9 @@ package com.arm.voiceassistant.utils
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.util.Log
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +59,9 @@ class SystemStatusMonitor(
     private val _thermalStatus = MutableStateFlow(0)
     val thermalStatus: StateFlow<Int> = _thermalStatus.asStateFlow()
 
+    private val _batteryPercentage = MutableStateFlow(0)
+    val batteryPercentage: StateFlow<Int> = _batteryPercentage.asStateFlow()
+
     private var job: Job? = null
 
     /**
@@ -71,6 +77,7 @@ class SystemStatusMonitor(
                 _memoryUsageGb.value = readMemoryUsageGb()
                 _memoryAvailableGb.value = readMemoryAvailableGb()
                 _thermalStatus.value = readThermalStatus()
+                _batteryPercentage.value = readBatteryPercentage()
 
                 delay(intervalSeconds * 1000L)
             }
@@ -146,5 +153,29 @@ class SystemStatusMonitor(
        var thermalStatus =  powerManager.currentThermalStatus
        Log.d(VOICE_ASSISTANT_TAG,"Current thermal status $thermalStatus / 6")
        return thermalStatus
+    }
+
+    /**
+     * Reads current battery percentage using the sticky ACTION_BATTERY_CHANGED broadcast.
+     *
+     * @return Battery percentage in the range [0, 100]. Returns 0 if unavailable.
+     */
+    private fun readBatteryPercentage(): Int {
+        val batteryStatus: Intent? = appContext.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        )
+
+        val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+
+        if (level < 0 || scale <= 0) {
+            Log.w(VOICE_ASSISTANT_TAG, "Unable to read battery percentage")
+            return 0
+        }
+
+        val percentage = ((level * 100f) / scale).toInt().coerceIn(0, 100)
+        Log.d(VOICE_ASSISTANT_TAG, "Current battery percentage $percentage%")
+        return percentage
     }
 }

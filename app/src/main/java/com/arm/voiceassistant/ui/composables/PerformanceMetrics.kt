@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BatteryFull
 import androidx.compose.material.icons.outlined.DeviceThermostat
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material3.Icon
@@ -48,6 +50,7 @@ fun ModelMetrics(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .testTag("model_metrics_row"),
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Memory: RTVA used / available
@@ -69,13 +72,19 @@ fun ModelMetrics(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
         // Thermal
         StatusItem(icon = Icons.Outlined.DeviceThermostat) {
             ThermalStatusText(
                 textStyle = valueStyle,
                 modifier = Modifier.testTag("metric_thermal")
+            )
+        }
+
+        // Battery
+        StatusItem(icon = Icons.Outlined.BatteryFull) {
+            BatteryPercentageText(
+                textStyle = valueStyle,
+                modifier = Modifier.testTag("metric_battery")
             )
         }
     }
