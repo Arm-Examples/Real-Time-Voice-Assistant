@@ -12,8 +12,8 @@ project(stt-module
 
 include(FetchContent)
 
-set(STT_MODULE_GIT_URL "https://gitlab.arm.com/kleidi/kleidi-examples/speech-to-text")
-set(STT_MODULE_GIT_SHA "4a60a7c9fa5a7cf8becbc5fc2e4b9e2f1d3ff035")
+set(STT_MODULE_GIT_URL "https://github.com/Arm-Examples/STT-Runner.git")
+set(STT_MODULE_GIT_SHA "ac3e43d201553c8f3e51ce8347879aa0ca843826")
 set(STT_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/stt-src")
 
 if(${ANDROID_ABI} STREQUAL "arm64-v8a")

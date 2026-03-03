@@ -1,5 +1,5 @@
 <!--
-    SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+    SPDX-FileCopyrightText: Copyright 2024-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 
     SPDX-License-Identifier: Apache-2.0
 -->
@@ -225,5 +225,5 @@ This project also includes a number of other projects, please see the license se
 [](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#license)
 
 
-[Kleidi / kleidi-examples /Speech to Text](https://gitlab.arm.com/kleidi/kleidi-examples/speech-to-text#license)
+[Arm-Examples / STT-Runner](https://github.com/Arm-Examples/STT-Runner#license)
 
