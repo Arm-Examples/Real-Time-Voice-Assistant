@@ -139,9 +139,9 @@ If no value is provided, the default is used.
 > if a different framework is preferred by default.
 
 > **NOTE**: MediaPipe™ support is only for limited models. Please set your [Hugging Face](https://huggingface.co/) access token in your `.netrc` file.
-> Refer to the [custom configuration of mediapipe](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#mediapipe-model) for more details.
+> Refer to the [custom configuration of mediapipe](https://github.com/Arm-Examples/LLM-Runner#mediapipe-model) for more details.
 
-Details on supported LLM models can be found [here](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#supported-models).
+Details on supported LLM models can be found [here](https://github.com/Arm-Examples/LLM-Runner#supported-models).
 
 ## Custom LLM Configuration
 
@@ -149,13 +149,13 @@ This application supports custom configuration of the LLM via a JSON-formatted f
 
 Details on custom LLM configuration can be found in the links below:
 
-[Custom configuration of llama.cpp](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#llama-cpp-model)
+[Custom configuration of llama.cpp](https://github.com/Arm-Examples/LLM-Runner#llama-cpp-model)
 
-[Custom configuration of onnxruntime-genai](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#onnxruntime-genai-model)
+[Custom configuration of onnxruntime-genai](https://github.com/Arm-Examples/LLM-Runner#onnxruntime-genai-model)
 
-[Custom configuration of mnn](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#mnn-model)
+[Custom configuration of mnn](https://github.com/Arm-Examples/LLM-Runner#mnn-model)
 
-[Custom configuration of mediapipe](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#mediapipe-model)
+[Custom configuration of mediapipe](https://github.com/Arm-Examples/LLM-Runner#mediapipe-model)
 
 
 ## Custom STT Configuration
@@ -221,9 +221,7 @@ This project is distributed under the software licenses in [LICENSES](LICENSES) 
 This project also includes a number of other projects, please see the license sections below for additional details:
 
 
-[Kleidi / kleidi-examples / Large Language Models](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#license)
-[](https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models#license)
-
+[Arm-Examples / LLM-Runner](https://github.com/Arm-Examples/LLM-Runner#license)
 
 [Arm-Examples / STT-Runner](https://github.com/Arm-Examples/STT-Runner#license)
 
