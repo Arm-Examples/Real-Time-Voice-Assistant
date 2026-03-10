@@ -43,7 +43,7 @@ for optimized performance on Arm® CPU.
 ## Pre-requisites
 
 1. Download and install the latest version of [Android Studio](https://developer.android.com/studio)
-2. Install the [Android NDK](https://developer.android.com/studio/projects/install-ndk). This project was tested with Android NDK r27.
+2. Install the [Android NDK](https://developer.android.com/studio/projects/install-ndk). This project was tested with Android NDK r29.
 3. Python 3 must be installed. It is used to push resources and model files to the device.
 
 ## Dependencies
@@ -192,7 +192,7 @@ The following ABIs (Application Binary Interfaces) are supported:
 
 ## Supported NDK Versions
 
-The application has been built and tested using the following Android NDK r27 version.
+The application has been built and tested using the following Android NDK r29 version.
 Other versions may work but have not been officially tested.
 
 ## Troubleshooting

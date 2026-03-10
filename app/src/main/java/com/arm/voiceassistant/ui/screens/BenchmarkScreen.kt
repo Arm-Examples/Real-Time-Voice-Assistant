@@ -77,6 +77,7 @@ fun BenchmarkScreen(
     val inputSizes = listOf(64, 128, 256, 512)
     val outputSizes = listOf(64, 128, 256, 512)
     val iterationOptions = listOf(1, 3, 5, 10, 20)
+    val contextSizeOptions = listOf(1024, 2048, 3072, 4096)
     val warmupIteration = (0..5).toList()
     val threadOptions = remember { (1..cpuCount).toList() }
 
@@ -131,6 +132,7 @@ fun BenchmarkScreen(
 
     var selectedInputSize by remember { mutableIntStateOf(128) }
     var selectedOutputSize by remember { mutableIntStateOf(128) }
+    var selectedContextSize by remember { mutableIntStateOf(2048) }
     var selectedThreads by remember { mutableIntStateOf(minOf(4, cpuCount)) }
     var selectedIterations by remember { mutableIntStateOf(5) }
     var selectedWarmup by remember { mutableIntStateOf(1) }
@@ -286,7 +288,15 @@ fun BenchmarkScreen(
                                 enabled = !isRunning
                             )
                         }
-                        Spacer(Modifier.weight(1f))
+                        Box(Modifier.weight(1f)) {
+                            BaseDropdown(
+                                label = "ContextSize",
+                                options = contextSizeOptions,
+                                selected = selectedContextSize,
+                                onSelected = { selectedContextSize = it },
+                                enabled = !isRunning
+                            )
+                        }
                     }
                 }
             }
@@ -330,6 +340,7 @@ fun BenchmarkScreen(
                                                 selectedModel,
                                                 selectedInputSize,
                                                 selectedOutputSize,
+                                                selectedContextSize,
                                                 selectedThreads,
                                                 selectedIterations,
                                                 selectedWarmup

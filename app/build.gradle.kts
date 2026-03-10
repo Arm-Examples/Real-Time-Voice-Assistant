@@ -80,13 +80,36 @@ android {
         }
         jniLibs {
             useLegacyPackaging = true
+
+            // Need to filter out the duplicate ggml shared libs from Whisper/llama.cpp, otherwise gradle build
+            // will detect duplicates libs and throw a fatal error during build of APK
+            pickFirsts.add("**/libggml*.so")
         }
     }
-
-    val stagedSharedLibraryPath = project(":llm").layout.buildDirectory.dir("staged")
+    // Need to filter out the ggml shared libs from Whisper when backend is llama.cpp, otherwise gradle build
+    // will detect duplicate shared libs and throw a fatal error during build of APK
+    val sttStagedSharedLibraryPath = project(":stt").layout.buildDirectory.dir("staged")
+    val sttFilteredSharedLibraryPath = project(":stt").layout.buildDirectory.dir("stagedFiltered")
+    val isLlama = rootProject.extra["LLM_FRAMEWORK"]?.toString() == "llama.cpp"
+    if (isLlama) {
+        val copySttFiltered by tasks.registering(Copy::class) {
+            from(sttStagedSharedLibraryPath)
+            into(sttFilteredSharedLibraryPath)
+            exclude("**/libggml*.so")
+        }
+        tasks.named("preBuild").configure {
+            dependsOn(copySttFiltered)
+        }
+    }
+    val llmStagedSharedLibraryPath = project(":llm").layout.buildDirectory.dir("staged")
     sourceSets {
-        getByName("main").jniLibs.srcDir(
-            stagedSharedLibraryPath
+        getByName("main").jniLibs.srcDirs(
+            llmStagedSharedLibraryPath,
+            if(isLlama) {
+                sttFilteredSharedLibraryPath
+            } else {
+                sttStagedSharedLibraryPath
+            }
         )
     }
 }
@@ -101,6 +124,7 @@ androidComponents {
         listOf("merge${cap}JniLibs", "merge${cap}JniLibFolders").forEach { mergeName ->
             tasks.matching { it.name in setOf("merge${cap}JniLib", "merge${cap}JniLibFolders") }
                 .configureEach {
+                    dependsOn(project(":stt").tasks.named("buildCMake${cap}"))
                     dependsOn(project(":llm").tasks.named("buildCMake${cap}"))
                 }
         }

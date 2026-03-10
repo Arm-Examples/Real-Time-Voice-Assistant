@@ -164,12 +164,13 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         modelKey: String,
         inputTokens: Int,
         outputTokens: Int,
+        contextSize: Int,
         threads: Int,
         iterations: Int,
         warmup: Int
     ): String = benchmarkMutex.withLock {
         withContext(Dispatchers.IO) {
-            val code = runBenchmark(modelKey, inputTokens, outputTokens, threads, iterations, warmup)
+            val code = runBenchmark(modelKey, inputTokens, outputTokens, contextSize, threads, iterations, warmup)
             val results = getBenchmarkResults()
             if (code == 0) results else "Benchmark failed (code=$code)\n$results"
         }
@@ -328,9 +329,10 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         modelKey: String,
         inputTokens: Int,
         outputTokens: Int,
+        contextSize: Int,
         threads: Int,
         iterations: Int,
-        warmup: Int = 1
+        warmup: Int
     ): Int {
         val modelPath: String? = if (llmFramework == "llama.cpp") {
             resolveLlamaModelPath(modelKey)
@@ -347,6 +349,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             modelPath,
             inputTokens,
             outputTokens,
+            contextSize,
             threads,
             iterations,
             warmup,

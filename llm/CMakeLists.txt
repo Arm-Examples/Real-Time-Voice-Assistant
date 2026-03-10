@@ -12,8 +12,8 @@ project(llm-module
 
 include(FetchContent)
 
-set(LLM_MODULE_GIT_URL "https://gitlab.arm.com/kleidi/kleidi-examples/large-language-models")
-set(LLM_MODULE_GIT_SHA "8e0e5a886196d278d838e06736be7f1910704939")
+set(LLM_MODULE_GIT_URL "https://github.com/Arm-Examples/LLM-Runner.git")
+set(LLM_MODULE_GIT_SHA "11b231a1c31751bd15c916e7f636a2fe98416506")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
 
 FetchContent_Declare(
@@ -28,7 +28,7 @@ FetchContent_MakeAvailable(llmModule)
 # This block of code is required to copy llama.ccp arch variant shared libraries
 # to a known location so that they can be picked up by gradle build
 # and packaged with the APK.
-# This approach may be used by other backends in future so there is not check for
+# This approach may be used by other backends in future so there is no check for
 # which backend is being used.
 if (DEFINED ANDROID_ABI)
    set(SHARED_LIBS_STAGED_DIR "${CMAKE_SOURCE_DIR}/build/staged/${ANDROID_ABI}")
