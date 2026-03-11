@@ -26,6 +26,7 @@
   * [Supported NDK Versions](#supported-ndk-versions)
   * [Troubleshooting](#troubleshooting)
   * [Known issues](#known-issues)
+  * [Contributions](#contributions)
   * [Trademarks](#trademarks)
   * [License](#license)
 <!-- TOC -->
@@ -207,6 +208,10 @@ Other versions may work but have not been officially tested.
 ## Known issues
 
 > **NOTE**: The cancellation flow of the application is currently under testing. Further updates and improvements will follow.
+
+## Contributions
+
+The Real Time Voice Assistant project welcomes contributions. For more details on contributing to the repo please see the [contributors guide](./contributing.md#contributions).
 
 ## Trademarks
 
