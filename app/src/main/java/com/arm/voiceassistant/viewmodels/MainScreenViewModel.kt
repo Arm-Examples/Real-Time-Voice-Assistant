@@ -17,6 +17,10 @@ import androidx.lifecycle.viewModelScope
 import com.arm.Llm
 import com.arm.voiceassistant.BuildConfig
 import com.arm.voiceassistant.Pipeline
+import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryEntry
+import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryRepository
+import com.arm.voiceassistant.data.benchmark.BenchmarkOverheadSummary
+import com.arm.voiceassistant.data.benchmark.isValid
 import com.arm.voiceassistant.utils.ChatMessage
 import com.arm.voiceassistant.utils.ChatMetricsUpdater
 import com.arm.voiceassistant.utils.Constants.ContentStates
@@ -122,6 +126,8 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     private val tmpFilePath: File = application.applicationContext.cacheDir
     private val contentResolver = application.contentResolver
     private val sharedLibraryPath: String = application.applicationInfo?.nativeLibraryDir ?: ""
+    private val benchmarkHistoryRepository =
+        BenchmarkHistoryRepository(application.applicationContext.filesDir)
 
     lateinit var pipeline: Pipeline
     lateinit var llm: Llm
@@ -336,8 +342,54 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * Get the last benchmark results string from the native benchmark.
      */
     fun getBenchmarkResults(): String {
-        return llm.getBenchmarkResults()
+        return llm.getBenchmarkResultsJson()
     }
+
+    /**
+     * Get the last benchmark Java-vs-core timing breakdown, if available.
+     */
+    fun getBenchmarkOverheads(): BenchmarkOverheadSummary? {
+        if (!::llm.isInitialized) {
+            return null
+        }
+
+        val summary = BenchmarkOverheadSummary(
+            javaEncodeTotalMs = llm.getLastBenchmarkJavaEncodeTotalMs(),
+            coreCppEncodeTotalMs = llm.getLastBenchmarkCoreCppEncodeTotalMs(),
+            encodeOverheadMs = llm.getLastBenchmarkEncodeOverheadMs(),
+            javaDecodeTotalMs = llm.getLastBenchmarkJavaDecodeLoopTotalMs(),
+            coreCppDecodeTotalMs = llm.getLastBenchmarkCoreCppDecodeTotalMs(),
+            decodeOverheadMs = llm.getLastBenchmarkDecodeOverheadMs()
+        )
+
+        return if (!summary.isValid) {
+            Log.d(VOICE_ASSISTANT_TAG, "Ignoring invalid benchmark overhead summary: $summary")
+            null
+        } else {
+            summary
+        }
+    }
+
+    /**
+     * Returns the locally saved benchmark history entries.
+     */
+    suspend fun getBenchmarkHistory(): List<BenchmarkHistoryEntry> =
+        benchmarkHistoryRepository.getHistory()
+
+    /**
+     * Saves a benchmark run to local history.
+     */
+    suspend fun saveBenchmarkHistoryEntry(
+        title: String,
+        summaryJson: String,
+        overheads: BenchmarkOverheadSummary?
+    ) = benchmarkHistoryRepository.saveEntry(title, summaryJson, overheads)
+
+    /**
+     * Deletes a saved benchmark run from local history.
+     */
+    suspend fun deleteBenchmarkHistoryEntry(entryId: Long) =
+        benchmarkHistoryRepository.deleteEntry(entryId)
 
     /**
      * Reset to default values

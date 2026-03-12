@@ -13,7 +13,7 @@ project(llm-module
 include(FetchContent)
 
 set(LLM_MODULE_GIT_URL "https://github.com/Arm-Examples/LLM-Runner.git")
-set(LLM_MODULE_GIT_SHA "11b231a1c31751bd15c916e7f636a2fe98416506")
+set(LLM_MODULE_GIT_SHA "f12fbb4e5516d2cd9af336f260d37d1a39b25ec2")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
 
 FetchContent_Declare(

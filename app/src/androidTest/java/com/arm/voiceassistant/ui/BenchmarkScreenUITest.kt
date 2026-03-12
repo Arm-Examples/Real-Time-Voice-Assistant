@@ -15,7 +15,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.platform.app.InstrumentationRegistry
+import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryEntry
 import com.arm.voiceassistant.ui.screens.BenchmarkScreen
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.AppContext
@@ -74,12 +77,16 @@ class BenchmarkScreenUITest {
      *
      * @param modelOptionsOverride List of model names to inject for testing.
      */
-    private fun setBenchmarkContent(modelOptionsOverride: List<String>) {
+    private fun setBenchmarkContent(
+        modelOptionsOverride: List<String>,
+        historyEntriesOverride: List<BenchmarkHistoryEntry>? = null
+    ) {
         composeTestRule.setContent {
             VoiceAssistantTheme {
                 BenchmarkScreen(
                     viewModel = viewModel!!,
-                    modelOptionsOverride = modelOptionsOverride
+                    modelOptionsOverride = modelOptionsOverride,
+                    historyEntriesOverride = historyEntriesOverride
                 )
             }
         }
@@ -133,6 +140,80 @@ class BenchmarkScreenUITest {
         setBenchmarkContent(modelOptionsOverride = listOf("test-model"))
 
         composeTestRule.onNodeWithText("Results").assertDoesNotExist()
+    }
+
+    /**
+     * Verifies that saved benchmark history is shown and can be reopened.
+     */
+    @Test
+    fun testSavedHistoryCanBeOpened() {
+        val historyEntry = BenchmarkHistoryEntry(
+            id = 1L,
+            createdAtMs = 1_710_000_000_000L,
+            title = "Model: test-model • In:128 Out:128 Ctx:2048 • Threads:4 • Iter:5 • Warm:1",
+            summaryJson = """
+                {
+                  "framework":"mnn",
+                  "parameters":{
+                    "model_size":"1.00 GB",
+                    "num_threads":4,
+                    "num_iterations":5,
+                    "num_warmup":1,
+                    "num_input_tokens":128,
+                    "num_output_tokens":128,
+                    "context_size":2048
+                  },
+                  "results":{
+                    "mean":{
+                      "encode_tokens_per_sec":100.0,
+                      "decode_tokens_per_sec":50.0,
+                      "ttft_ms":10.0,
+                      "total_ms":20.0
+                    },
+                    "stddev":{
+                      "encode_tokens_per_sec":1.0,
+                      "decode_tokens_per_sec":2.0,
+                      "ttft_ms":0.5,
+                      "total_ms":1.5
+                    }
+                  }
+                }
+            """.trimIndent()
+        )
+
+        setBenchmarkContent(
+            modelOptionsOverride = listOf("test-model"),
+            historyEntriesOverride = listOf(historyEntry)
+        )
+
+        composeTestRule.onNodeWithText("Results").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_open_saved_run").performClick()
+        composeTestRule.onNodeWithTag("benchmark_saved_result_sheet").assertExists()
+    }
+
+    /**
+     * Verifies that a saved result can be removed after swiping left.
+     */
+    @Test
+    fun testSavedHistoryCanBeDeleted() {
+        val historyEntry = BenchmarkHistoryEntry(
+            id = 1L,
+            createdAtMs = 1_710_000_000_000L,
+            title = "Model: delete-me • In:128 Out:128 Ctx:2048 • Threads:4 • Iter:5 • Warm:1",
+            summaryJson = "{}"
+        )
+
+        setBenchmarkContent(
+            modelOptionsOverride = listOf("test-model"),
+            historyEntriesOverride = listOf(historyEntry)
+        )
+
+        composeTestRule.onNodeWithTag("benchmark_history_item_1").performTouchInput {
+            swipeLeft()
+        }
+        composeTestRule.onNodeWithTag("benchmark_delete_saved_run_1").performClick()
+        composeTestRule.onNodeWithText("Model: delete-me • In:128 Out:128 Ctx:2048 • Threads:4 • Iter:5 • Warm:1")
+            .assertDoesNotExist()
     }
 
     /**

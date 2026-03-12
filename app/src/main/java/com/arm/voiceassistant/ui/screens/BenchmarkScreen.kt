@@ -9,7 +9,6 @@ package com.arm.voiceassistant.ui.screens
 import android.os.Environment
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,20 +23,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,19 +43,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.arm.voiceassistant.BuildConfig
+import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryEntry
 import com.arm.voiceassistant.ui.composables.BaseDropdown
+import com.arm.voiceassistant.ui.composables.BenchmarkHistorySection
+import com.arm.voiceassistant.ui.composables.BenchmarkSavedResultSheet
 import com.arm.voiceassistant.ui.composables.ModelMetrics
 import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
@@ -69,12 +64,40 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Creates a temporary benchmark entry for unsaved failures or exceptions.
+ */
+private fun createTransientBenchmarkEntry(
+    title: String,
+    summaryJson: String,
+): BenchmarkHistoryEntry {
+    val timestampMs = System.currentTimeMillis()
+    return BenchmarkHistoryEntry(
+        id = timestampMs,
+        createdAtMs = timestampMs,
+        title = title,
+        summaryJson = summaryJson,
+    )
+}
+
+private sealed interface BenchmarkOutcome {
+    data class Success(
+        val summary: String,
+        val overheads: com.arm.voiceassistant.data.benchmark.BenchmarkOverheadSummary?
+    ) : BenchmarkOutcome
+
+    data class Failure(val code: Int) : BenchmarkOutcome
+}
+
+/**
+ * Displays the benchmark configuration screen and saved results history.
+ */
 @Composable
 fun BenchmarkScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier,
-    modelOptionsOverride: List<String>? = null, // NEW: test override to avoid CI flakiness
+    modelOptionsOverride: List<String>? = null,
+    historyEntriesOverride: List<BenchmarkHistoryEntry>? = null,
 ) {
     val cpuCount = remember { Runtime.getRuntime().availableProcessors() }
     val inputSizes = listOf(64, 128, 256, 512)
@@ -87,6 +110,7 @@ fun BenchmarkScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val hasHistoryOverrides = historyEntriesOverride != null
 
     // Align with Chat/ModeSelection background styling
     val backgroundModifier = if (isSystemInDarkTheme()) {
@@ -141,8 +165,27 @@ fun BenchmarkScreen(
     var selectedWarmup by remember { mutableIntStateOf(1) }
 
     var isRunning by remember { mutableStateOf(false) }
-    var lastRunSummary by remember { mutableStateOf<String?>(null) }
-    var lastRunTitle by remember { mutableStateOf<String?>(null) }
+    var historyEntries by remember(historyEntriesOverride) {
+        mutableStateOf(historyEntriesOverride.orEmpty())
+    }
+    var selectedHistoryEntry by remember { mutableStateOf<BenchmarkHistoryEntry?>(null) }
+
+    LaunchedEffect(viewModel, historyEntriesOverride) {
+        historyEntries = if (hasHistoryOverrides) {
+            historyEntriesOverride.orEmpty()
+        } else {
+            viewModel.getBenchmarkHistory()
+        }
+    }
+
+    selectedHistoryEntry?.let { entry ->
+        BenchmarkSavedResultSheet(
+            entry = entry,
+            clipboard = clipboard,
+            onDismissRequest = { selectedHistoryEntry = null },
+        )
+    }
+
     fun coerceContextSize(
         inputSize: Int,
         outputSize: Int,
@@ -382,12 +425,11 @@ fun BenchmarkScreen(
                             onClick = {
                                 scope.launch {
                                     isRunning = true
-                                    lastRunSummary = null
-                                    lastRunTitle =
+                                    val runTitle =
                                         "Model: $selectedModel • In:$selectedInputSize Out:$selectedOutputSize Ctx:$selectedContextSize • Threads:$selectedThreads • Iter:$selectedIterations • Warm:$selectedWarmup"
 
                                     try {
-                                        val summary = withContext(Dispatchers.IO) {
+                                        val benchmarkOutcome = withContext(Dispatchers.IO) {
                                             val code = viewModel.runBenchmark(
                                                 selectedModel,
                                                 selectedInputSize,
@@ -397,14 +439,49 @@ fun BenchmarkScreen(
                                                 selectedIterations,
                                                 selectedWarmup
                                             )
-                                            val results = viewModel.getBenchmarkResults()
-                                            if (code == 0) results
-                                            else "Benchmark failed (code=$code)\n$results"
+                                            if (code == 0) {
+                                                BenchmarkOutcome.Success(
+                                                    summary = viewModel.getBenchmarkResults(),
+                                                    overheads = viewModel.getBenchmarkOverheads()
+                                                )
+                                            } else {
+                                                BenchmarkOutcome.Failure(code)
+                                            }
                                         }
-                                        lastRunSummary = summary
+
+                                        when (benchmarkOutcome) {
+                                            is BenchmarkOutcome.Failure -> {
+                                                selectedHistoryEntry = createTransientBenchmarkEntry(
+                                                    title = runTitle,
+                                                    summaryJson = "Benchmark failed (code=${benchmarkOutcome.code})"
+                                                )
+                                            }
+                                            is BenchmarkOutcome.Success -> {
+                                                if (!hasHistoryOverrides) {
+                                                    runCatching {
+                                                        viewModel.saveBenchmarkHistoryEntry(
+                                                            title = runTitle,
+                                                            summaryJson = benchmarkOutcome.summary,
+                                                            overheads = benchmarkOutcome.overheads
+                                                        )
+                                                        historyEntries = viewModel.getBenchmarkHistory()
+                                                    }.onFailure {
+                                                        selectedHistoryEntry = createTransientBenchmarkEntry(
+                                                            title = runTitle,
+                                                            summaryJson = benchmarkOutcome.summary
+                                                        )
+                                                        ToastService.showToast(
+                                                            "Benchmark completed, but saving the result failed."
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                     } catch (t: Throwable) {
-                                        lastRunSummary =
-                                            "Benchmark threw: ${t.message ?: (t::class.simpleName ?: "Unknown error")}"
+                                        selectedHistoryEntry = createTransientBenchmarkEntry(
+                                            title = runTitle,
+                                            summaryJson = "Benchmark threw: ${t.message ?: (t::class.simpleName ?: "Unknown error")}"
+                                        )
                                     } finally {
                                         isRunning = false
                                     }
@@ -430,8 +507,7 @@ fun BenchmarkScreen(
                 }
             }
 
-            // Results
-            AnimatedVisibility(visible = lastRunSummary != null) {
+            AnimatedVisibility(visible = historyEntries.isNotEmpty()) {
                 ElevatedCard(
                     modifier = sectionCardModifier,
                     colors = sectionCardColors
@@ -440,48 +516,29 @@ fun BenchmarkScreen(
                         modifier = sectionContentModifier,
                         verticalArrangement = sectionSpacing
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Results", style = MaterialTheme.typography.titleMedium)
-                                lastRunTitle?.let {
-                                    Text(
-                                        text = it,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                        BenchmarkHistorySection(
+                            entries = historyEntries,
+                            onOpenEntry = { entry ->
+                                selectedHistoryEntry = entry
+                            },
+                            onDeleteEntry = { entry ->
+                                if (selectedHistoryEntry?.id == entry.id) {
+                                    selectedHistoryEntry = null
                                 }
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    lastRunSummary?.let { clipboard.setText(AnnotatedString(it)) }
-                                },
-                                enabled = lastRunSummary != null
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy results")
-                            }
-                        }
-
-                        val hScroll = rememberScrollState()
-                        Surface(
-                            tonalElevation = 2.dp,
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = lastRunSummary.orEmpty(),
-                                fontFamily = FontFamily.Monospace,
-                                softWrap = false,
-                                overflow = TextOverflow.Visible,
-                                lineHeight = 16.sp,
-                                modifier = Modifier
-                                    .padding(12.dp)
-                                    .horizontalScroll(hScroll)
-                                    .alpha(if (lastRunSummary == null) 0f else 1f)
-                            )
-                        }
+                                if (hasHistoryOverrides) {
+                                    historyEntries = historyEntries.filterNot { it.id == entry.id }
+                                } else {
+                                    scope.launch {
+                                        runCatching {
+                                            viewModel.deleteBenchmarkHistoryEntry(entry.id)
+                                            historyEntries = historyEntries.filterNot { it.id == entry.id }
+                                        }.onFailure {
+                                            ToastService.showToast("Failed to delete saved result.")
+                                        }
+                                    }
+                                }
+                            },
+                        )
                     }
                 }
             }
