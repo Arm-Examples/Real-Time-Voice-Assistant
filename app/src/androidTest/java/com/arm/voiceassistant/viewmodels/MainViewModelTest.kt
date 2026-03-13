@@ -69,7 +69,6 @@ class MainViewModelTest {
         assertEquals(Constants.INITIAL_METRICS_VALUE, mainUiState?.value?.sttTime)
         assertEquals(Constants.INITIAL_METRICS_VALUE, mainUiState?.value?.llmEncodeTPS)
         assertEquals(Constants.INITIAL_METRICS_VALUE, mainUiState?.value?.llmDecodeTPS)
-        assertEquals(false, mainUiState?.value?.displayPerformance)
     }
 
     /**

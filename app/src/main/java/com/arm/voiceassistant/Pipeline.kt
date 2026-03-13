@@ -16,26 +16,29 @@ import com.arm.stt.WhisperConfig
 import com.arm.voiceassistant.audio.AudioReader
 import com.arm.voiceassistant.speech.SpeechRecorder
 import com.arm.voiceassistant.speech.SpeechSynthesis
+import kotlinx.coroutines.cancel
 import com.arm.voiceassistant.ui.composables.pipeline
 import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Constants.LLM_INITIALIZATION_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_CONTEXT_CAPACITY_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_QUERY_EVALUATION_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_IMAGE_ADD_ERROR
+import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
+import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
+import com.arm.voiceassistant.utils.ToastService
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.createLlmDefaultConfig
-import com.arm.voiceassistant.utils.Utils.createWhisperDefaultConfig
+import com.arm.voiceassistant.utils.Utils.createSttDefaultConfig
 import com.arm.voiceassistant.utils.Utils.isValidLlmConfig
-import com.arm.voiceassistant.utils.Utils.isValidWhisperConfig
+import com.arm.voiceassistant.utils.Utils.isValidSttConfig
 import com.arm.voiceassistant.utils.Utils.readLlmUserConfig
-import com.arm.voiceassistant.utils.Utils.readWhisperUserConfig
+import com.arm.voiceassistant.utils.Utils.readSttUserConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -94,6 +97,9 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
         Log.i(VOICE_ASSISTANT_TAG,"Android Shared Library Path $sharedLibraryPath")
 
         if (!isTest) {
+            if(hasSME()) {
+                ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
+            }
             initializeSTT(modelPath)
             initializeLLM(modelPath)
         }
@@ -171,11 +177,11 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
                 val configFileWhisper = File("$modelPath/$configFileNameSTT")
                 var whisperParams = WhisperConfig()
                 if (configFileWhisper.exists()) {
-                    if (isValidWhisperConfig(configFileWhisper)) {
-                        whisperParams = readWhisperUserConfig(configFileWhisper)
+                    if (isValidSttConfig(configFileWhisper)) {
+                        whisperParams = readSttUserConfig(configFileWhisper)
                     }
             } else {
-                    whisperParams = createWhisperDefaultConfig()
+                    whisperParams = createSttDefaultConfig()
                 }
                 // Initialize stt parameters
                 stt.initParameters(whisperParams)
@@ -407,7 +413,7 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
     suspend fun generateResponseTokens(transcription: String) {
         lastImageEncodeJob?.join()
         sendToLlm(transcription)
-        }
+    }
 
     /**
      * Finalize speech synthesis
@@ -462,7 +468,6 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
             }
             Log.i(VOICE_ASSISTANT_TAG, "file location is ${originalResImage.absolutePath}")
 
-
             lastImageEncodeJob = llmScope.launch {
                 runCatching {
                     sendToLlm(query = "")
@@ -476,7 +481,6 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
             Log.e(VOICE_ASSISTANT_TAG, LLM_IMAGE_ADD_ERROR, e)
             throw RuntimeException(LLM_IMAGE_ADD_ERROR)
         }
-
     }
 
     /**

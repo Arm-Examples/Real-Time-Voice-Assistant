@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -20,7 +20,7 @@ private const val RESULT_ERROR = 2
 sealed class NativeResult {
     data class Success(val data: String?) : NativeResult()
     data class Error(val code: Int, val message: String?) : NativeResult()
-    object Cancelled : NativeResult()
+    data object Cancelled : NativeResult()
 }
 
 object NativeBridge {
@@ -74,9 +74,7 @@ object ContinuationRegistry {
     }
 }
 
-open class LlmBridge(llm: Llm) {
-
-    var llm = llm
+open class LlmBridge(var llm: Llm) {
 
     external fun nativeCancel(operationId: Long)
 

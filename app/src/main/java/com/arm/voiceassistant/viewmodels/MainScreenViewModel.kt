@@ -30,7 +30,9 @@ import com.arm.voiceassistant.utils.Constants.MIN_ALLOWED_RECORDING
 import com.arm.voiceassistant.utils.Constants.MODEL_NOT_FOUND_ERROR
 import com.arm.voiceassistant.utils.Constants.PIPELINE_INIT_ERROR
 import com.arm.voiceassistant.utils.Constants.RESPONSE_JOB_IN_PROGRESS_ERROR
+import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
+import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
 import com.arm.voiceassistant.utils.LlmBridge
 import com.arm.voiceassistant.utils.NativeResult
 import com.arm.voiceassistant.utils.Timer
@@ -53,7 +55,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
@@ -80,7 +81,6 @@ data class MainUiState(
     val recTime: String = "00:00",
     val recTimeMs: Long = 0,
     val playingAudio: Boolean = false,
-    val displayPerformance: Boolean = false,
     val sttTime: String = INITIAL_METRICS_VALUE,
     val llmEncodeTPS: String = INITIAL_METRICS_VALUE,
     val llmDecodeTPS: String = INITIAL_METRICS_VALUE,
@@ -140,50 +140,12 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     private var llmFramework = BuildConfig.LLM_FRAMEWORK
     private var encodeUpdatedForThisTurn = false
 
-    private val benchmarkMutex = Mutex()
     private val pipelineMutex = Mutex()
     private val isTestMode = isTest
 
+
     private val stringStatusFlow = MutableSharedFlow<String>()
     val errorFlow: SharedFlow<String> = stringStatusFlow.asSharedFlow()
-
-    /**
-     * Runs an LLM benchmark and returns its result summary as a single atomic operation.
-     *
-     * @param modelKey Logical model name selected in the UI.
-     * @param inputTokens Number of input tokens for the synthetic prompt.
-     * @param outputTokens Number of tokens to generate during decode.
-     * @param contextSize Context length in tokens (must exceed input + output tokens).
-     * @param threads Number of runtime threads to use.
-     * @param iterations Number of measured benchmark iterations.
-     * @param warmup Number of warm-up iterations (excluded from stats).
-     *
-     * @return A human-readable benchmark summary string. If the benchmark fails,
-     * the returned string includes the failure code and any available output.
-     */
-    suspend fun runBenchmarkAndGetSummary(
-        modelKey: String,
-        inputTokens: Int,
-        outputTokens: Int,
-        contextSize: Int,
-        threads: Int,
-        iterations: Int,
-        warmup: Int
-    ): String = benchmarkMutex.withLock {
-        withContext(Dispatchers.IO) {
-            val code = runBenchmark(
-                modelKey,
-                inputTokens,
-                outputTokens,
-                contextSize,
-                threads,
-                iterations,
-                warmup
-            )
-            val results = getBenchmarkResults()
-            if (code == 0) results else "Benchmark failed (code=$code)\n$results"
-        }
-    }
 
     /**
      * Initializes the [Pipeline] and related LLM helpers.
@@ -212,6 +174,9 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * Synchronized entry for pipeline init using a coroutine-friendly mutex.
      */
     private suspend fun initPipeline(isTest: Boolean) = pipelineMutex.withLock {
+        if(hasSME()) {
+            ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
+        }
         initPipelineLocked(isTest)
     }
 
@@ -342,7 +307,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         contextSize: Int,
         threads: Int,
         iterations: Int,
-        warmup: Int
+        warmup: Int = 1
     ): Int {
         val modelPath: String? = if (llmFramework == "llama.cpp") {
             resolveLlamaModelPath(modelKey)
@@ -378,7 +343,6 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * Reset to default values
      */
     private fun reset() {
-        val preservePerformance = _uiState.value.displayPerformance
         _uiState.value = MainUiState(
             contentState = ContentStates.Idle,
             error = Error(),
@@ -386,8 +350,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             responseText = "",
             recTime = "00:00",
             recTimeMs = 0,
-            playingAudio = false,
-            displayPerformance = preservePerformance // Preserves display performance opened when resetting the metrics
+            playingAudio = false
         )
     }
 
@@ -398,7 +361,6 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         runCatching {
         // Reset state from previous run
             clearResponseText()
-        //clearPerformanceMetrics()
             _uiState.update { currentState ->
                 currentState.copy(
                     playingAudio = false,
@@ -558,8 +520,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             currentState.copy(
                 sttTime = INITIAL_METRICS_VALUE,
                 llmEncodeTPS = INITIAL_METRICS_VALUE,
-                llmDecodeTPS = INITIAL_METRICS_VALUE,
-                displayPerformance = false
+                llmDecodeTPS = INITIAL_METRICS_VALUE
             )
         }
     }
@@ -673,15 +634,6 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             currentState.copy(responseText = text)
         }
         messages.add(ChatMessage.AssistantText(text))
-    }
-
-    /**
-     * Toggle displaying performance metrics
-     */
-    fun togglePerformanceMetrics() {
-        _uiState.update { currentState ->
-            currentState.copy(displayPerformance = !_uiState.value.displayPerformance)
-        }
     }
 
     /**
@@ -804,7 +756,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
                     }
 
                     launch(Dispatchers.Main) {
-                        complete = complete || Utils.responseComplete(token)
+                        complete = complete || responseComplete(token)
                         if (!complete) {
                             updateResponseFieldCallback(token)
                         } else {
@@ -822,7 +774,6 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             }
         }
     }
-
 
     /**
      * Asynchronous handling of the LLM + SS part of the pipeline

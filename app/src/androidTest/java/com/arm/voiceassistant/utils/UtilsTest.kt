@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -26,6 +26,9 @@ import java.io.File
 class UtilsTest {
 
     private val modelPath = "/opt/models"
+
+    private val expectedSystemPrompt = "You are a helpful and factual AI assistant named Orbita. " +
+            "Orbita answers with maximum of four sentences."
 
     private val stopWords:List<String> = mutableListOf(
         "Orbita:", "User:", "AI:", "<|user|>", "Assistant:", "user:",
@@ -93,9 +96,6 @@ class UtilsTest {
      */
     @Test
     fun testCreateDefaultConfigForLlamaFramework() {
-        val expectedLlmPrefix = "Transcript of a dialog, where the User interacts with an AI Assistant named Orbita." +
-                "Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences" +
-                "User:"
         val defaultConfig = createLlmDefaultConfig(modelPath, "llama.cpp")
 
         assertEquals(true, defaultConfig.model.isVision)
@@ -105,6 +105,7 @@ class UtilsTest {
         assertEquals("<|im_end|>", defaultConfig.stopWords.last())
         assertEquals(256, defaultConfig.runtime.batchSize)
         assertEquals("$modelPath/llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf", defaultConfig.model.llmModelName)
+        assertEquals(expectedSystemPrompt, defaultConfig.chat.systemPrompt)
 
     }
 
@@ -115,9 +116,7 @@ class UtilsTest {
     fun testCreateDefaultConfigForOnnxrtGenaiFramework() {
         val defaultConfig = createLlmDefaultConfig(modelPath, "onnxruntime-genai")
 
-        val expectedLlmPrefix = "<|system|>Transcript of a dialog, where the User interacts with an AI Assistant named Orbita." +
-                "Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences<|end|><|user|>"
-        val stopWordsOnnx = stopWords.plus("<|end|>")
+        val stopWordsOnnx = stopWords.plus(listOf("<|im_end|>", "<|end|>"))
 
         assertEquals(false, defaultConfig.model.isVision)
         assertEquals("<|user|>%s<|end|><|assistant|>", defaultConfig.chat.userTemplate)
@@ -126,6 +125,8 @@ class UtilsTest {
         assertEquals("<|end|>", defaultConfig.stopWords.last())
         assertEquals(1, defaultConfig.runtime.batchSize)
         assertEquals("$modelPath/onnxruntime-genai/phi-4-mini", defaultConfig.model.llmModelName)
+        assertEquals(stopWordsOnnx, defaultConfig.stopWords)
+        assertEquals(expectedSystemPrompt, defaultConfig.chat.systemPrompt)
     }
 
     @Test

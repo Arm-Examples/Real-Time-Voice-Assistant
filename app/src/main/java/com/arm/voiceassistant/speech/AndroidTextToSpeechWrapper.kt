@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,6 +11,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.arm.voiceassistant.utils.Constants
+import org.jetbrains.annotations.TestOnly
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -23,6 +24,7 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
     var ttsInitialized = false
     var tts: TextToSpeech? = null
     var ttsInProgress = AtomicBoolean(false)
+    private var onUtteranceDoneCallback: (() -> Unit)? = null
 
     init {
         tts = TextToSpeech(context, this)
@@ -75,6 +77,7 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
             override fun onDone(utteranceId: String) {
                 Log.d(Constants.VOICE_ASSISTANT_TAG, "Android TTS Utterance completed: $utteranceId")
                 ttsInProgress.set(false)
+                onUtteranceDoneCallback?.invoke()
             }
 
             @Deprecated("Deprecated in Java")
@@ -84,8 +87,18 @@ class AndroidTTS(context: Context) : TextToSpeech.OnInitListener {
                     "Error with TTS utterance progress listener for: $utteranceId"
                 )
                 ttsInProgress.set(false)
+                onUtteranceDoneCallback?.invoke()
             }
         })
+    }
+
+    /**
+     * Store a callback that gets invoked when the utterance finishes successfully.
+     * Used to let the tests know the utterance has completed.
+     */
+    @TestOnly
+    fun setOnUtteranceDoneCallback(callback: (() -> Unit)?) {
+        onUtteranceDoneCallback = callback
     }
 
     /**
