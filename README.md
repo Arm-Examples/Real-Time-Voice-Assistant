@@ -9,6 +9,8 @@
 <!-- TOC -->
 * [Android Voice Assistant Application](#android-voice-assistant-application)
   * [Introduction](#introduction)
+  * [Demo](#demo)
+  * [Documentation](#documentation)
   * [Pre-requisites](#pre-requisites)
   * [Dependencies](#dependencies)
   * [Application pipeline](#application-pipeline)
@@ -40,6 +42,20 @@ It utilizes Speech-to-Text (STT) and Large Language Models (LLM) to process user
 and generate intelligent responses. Android Text-to-Speech API is then used to produce a voice response.
 This application demonstrates a complete voice interaction pipeline for Android and by default uses [KleidiAI library](https://gitlab.arm.com/kleidi/kleidiai)
 for optimized performance on Arm® CPU.
+
+
+## Demo
+
+https://github.com/user-attachments/assets/b6c363b4-3cd6-4e0b-bef2-0aacf2df2cf3
+
+## Documentation
+
+Start with the guides in `docs/`:
+
+- [Build and Configure](docs/build_and_configure.md)
+- [Repository Overview](docs/system_overview.md)
+- [Benchmarking](docs/benchmarking.md)
+- [Contributing](docs/contributing.md)
 
 ## Pre-requisites
 
@@ -175,6 +191,7 @@ In addition to the default settings, this application allows you to provide cust
 
 You only need to modify the values associated with these keys if you wish to customize the STT's behavior. Do not remove any of the keys, as they are mandatory for the configuration to work properly.
 
+
 ## Resources
 
 The STT and LLM modules automatically download the required neural network models during the build process.
@@ -211,7 +228,7 @@ Other versions may work but have not been officially tested.
 
 ## Contributions
 
-The Real Time Voice Assistant project welcomes contributions. For more details on contributing to the repo please see the [contributors guide](./contributing.md#contributions).
+The Real Time Voice Assistant project welcomes contributions. For more details on contributing to the repo please see the [contributors guide](docs/contributing.md#contributions).
 
 ## Trademarks
 
@@ -229,4 +246,3 @@ This project also includes a number of other projects, please see the license se
 [Arm-Examples / LLM-Runner](https://github.com/Arm-Examples/LLM-Runner#license)
 
 [Arm-Examples / STT-Runner](https://github.com/Arm-Examples/STT-Runner#license)
-
