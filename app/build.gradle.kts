@@ -17,7 +17,6 @@ project.ext.set("CONFIG_DIR_STT", "$projectDir/../stt/stt-src/model_configuratio
 project.ext.set("DEVICE_FOLDER", "/storage/emulated/0/Android/data/com.arm.voiceassistant/files/Download/")
 project.ext.set("PUSH_MODELS_PY", "$projectDir/pushAppResources.py")
 
-
 apply("download.gradle")
 
 android {
@@ -146,6 +145,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.bundles.retrofit)
     implementation(libs.google.accompanist.permissions)
     implementation(libs.google.gson)
     implementation(libs.glide.compose)

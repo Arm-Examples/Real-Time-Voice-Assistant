@@ -96,7 +96,8 @@ class UtilsTest {
      */
     @Test
     fun testCreateDefaultConfigForLlamaFramework() {
-        val defaultConfig = createLlmDefaultConfig(modelPath, "llama.cpp")
+        val llmFramework = "llama.cpp"
+        val defaultConfig = createLlmDefaultConfig(modelPath, llmFramework)
 
         assertEquals(true, defaultConfig.model.isVision)
         assertEquals("<|im_end|>", defaultConfig.stopWords.last())
@@ -104,7 +105,7 @@ class UtilsTest {
         assertEquals( "<|im_start|>system\n%s<|im_end|>\n", defaultConfig.chat.systemTemplate)
         assertEquals("<|im_end|>", defaultConfig.stopWords.last())
         assertEquals(256, defaultConfig.runtime.batchSize)
-        assertEquals("$modelPath/llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf", defaultConfig.model.llmModelName)
+        assertEquals("$modelPath/$llmFramework/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf", defaultConfig.model.llmModelName)
         assertEquals(expectedSystemPrompt, defaultConfig.chat.systemPrompt)
 
     }
@@ -114,7 +115,8 @@ class UtilsTest {
      */
     @Test
     fun testCreateDefaultConfigForOnnxrtGenaiFramework() {
-        val defaultConfig = createLlmDefaultConfig(modelPath, "onnxruntime-genai")
+        val llmFramework = "onnxruntime-genai"
+        val defaultConfig = createLlmDefaultConfig(modelPath, llmFramework)
 
         val stopWordsOnnx = stopWords.plus(listOf("<|im_end|>", "<|end|>"))
 
@@ -124,7 +126,7 @@ class UtilsTest {
         assertEquals( "<|system|>%s<|end|>", defaultConfig.chat.systemTemplate)
         assertEquals("<|end|>", defaultConfig.stopWords.last())
         assertEquals(1, defaultConfig.runtime.batchSize)
-        assertEquals("$modelPath/onnxruntime-genai/phi-4-mini", defaultConfig.model.llmModelName)
+        assertEquals("$modelPath/$llmFramework/phi-4-mini", defaultConfig.model.llmModelName)
         assertEquals(stopWordsOnnx, defaultConfig.stopWords)
         assertEquals(expectedSystemPrompt, defaultConfig.chat.systemPrompt)
     }

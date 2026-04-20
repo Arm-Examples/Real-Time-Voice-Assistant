@@ -12,6 +12,7 @@ composeBom = "2024.12.01"
 coreKtx = "1.12.0"
 composeUi = "1.7.0"
 espressoCore = "3.6.1"
+glideCompose = "1.0.0-beta08"
 googleAccompanistPermissions = "0.34.0"
 gson = "2.10.1"
 junit = "4.13.2"
@@ -23,7 +24,8 @@ androidxTestRules = "1.5.0"
 navigationRuntimeKtx = "2.8.3"
 navigationCompose = "2.8.3"
 navigationTesting = "2.8.3"
-glideCompose = "1.0.0-alpha.5"
+okhttp3 = "4.12.0"
+retrofit2 = "2.9.0"
 
 [libraries]
 
@@ -51,6 +53,19 @@ mockito-android = { module = "org.mockito:mockito-android", version.ref = "mocki
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTestRules" }
 glide-compose = { group = "com.github.bumptech.glide", name = "compose", version.ref = "glideCompose" }
 
+# Retrofit
+squareup-retrofit2 = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit2" }
+squareup-retrofit2-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit2" }
+squareup-okhttp3-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
+
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+
+[bundles]
+retrofit = [
+    "squareup-retrofit2",
+    "squareup-retrofit2-converter-gson",
+    "squareup-okhttp3-logging-interceptor",
+]

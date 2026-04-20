@@ -7,8 +7,10 @@
 package com.arm.voiceassistant.viewmodels
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -21,10 +23,16 @@ import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryEntry
 import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryRepository
 import com.arm.voiceassistant.data.benchmark.BenchmarkOverheadSummary
 import com.arm.voiceassistant.data.benchmark.isValid
+import com.arm.voiceassistant.huggingface.DownloadProgressEvent
+import com.arm.voiceassistant.huggingface.HuggingFaceModel
+import com.arm.voiceassistant.huggingface.HuggingFaceApiService
+import com.arm.voiceassistant.huggingface.LoggingProgressListener
+import com.arm.voiceassistant.huggingface.ModelDownloadSpec
 import com.arm.voiceassistant.utils.ChatMessage
 import com.arm.voiceassistant.utils.ChatMetricsUpdater
 import com.arm.voiceassistant.utils.Constants.ContentStates
 import com.arm.voiceassistant.utils.Constants.EOS
+import com.arm.voiceassistant.utils.Constants.FAILED_TO_LOAD_MODELS
 import com.arm.voiceassistant.utils.Constants.INITIAL_METRICS_VALUE
 import com.arm.voiceassistant.utils.Constants.LLM_CONTEXT_CAPACITY_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_DECODE_ERROR
@@ -37,7 +45,12 @@ import com.arm.voiceassistant.utils.Constants.RESPONSE_JOB_IN_PROGRESS_ERROR
 import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
+import com.arm.voiceassistant.utils.DownloadUiState
+import com.arm.voiceassistant.utils.Error
 import com.arm.voiceassistant.utils.LlmBridge
+import com.arm.voiceassistant.utils.MainUiState
+import com.arm.voiceassistant.utils.ModelDetailsUiState
+import com.arm.voiceassistant.utils.ModelListUiState
 import com.arm.voiceassistant.utils.NativeResult
 import com.arm.voiceassistant.utils.Timer
 import com.arm.voiceassistant.utils.TimingStats
@@ -59,54 +72,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
-
-/**
- * Main screen UI state
- *
- * @property contentState state used to determine UI content to display
- * @property error error information
- * @property userText transcribed input from user
- * @property responseText text response from voice assistant
- * @property recTime formatted duration of current recording
- * @property recTimeMs the duration of current recording in ms
- * @property playingAudio if speech response is playing
- * @property sttTime whisper model time taken
- * @property llmEncodeTPS LLM model encode tokens/second
- * @property llmDecodeTPS LLM model decode tokens/second
- */
-data class MainUiState(
-    val contentState: ContentStates = ContentStates.Idle,
-    val error: Error = Error(),
-    val userText: String = "",
-    val responseText: String = "",
-    val imagePath: String = "",
-    val recTime: String = "00:00",
-    val recTimeMs: Long = 0,
-    val playingAudio: Boolean = false,
-    val sttTime: String = INITIAL_METRICS_VALUE,
-    val llmEncodeTPS: String = INITIAL_METRICS_VALUE,
-    val llmDecodeTPS: String = INITIAL_METRICS_VALUE,
-    val isTTSEnabled: Boolean = false,
-    val ttsWarningMessage: String? = null
-)
-
-/**
- * Class to hold error information
- * @property state true if there is an error
- * @property message error message to display
- */
-data class Error(
-    val state: Boolean = false,
-    val contextCapacity: Boolean = false,
-    val message: String = ""
-)
 
 /**
  * The default filename used for storing the recorded audio file.
  */
 private const val FILE_NAME = "recording.wav"
+
 
 /**
  * Main ViewModel responsible for holding and managing UI related data
@@ -119,6 +93,12 @@ private const val FILE_NAME = "recording.wav"
 class MainViewModel(application: Application, isTest: Boolean = false) : ViewModel() {
     private val _uiState = MutableStateFlow(MainUiState())
     var uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    private val _downloadUiState = MutableStateFlow(DownloadUiState())
+    val downloadUiState: StateFlow<DownloadUiState> = _downloadUiState.asStateFlow()
+    private val _modelListUiState = MutableStateFlow(ModelListUiState())
+    val modelListUiState: StateFlow<ModelListUiState> = _modelListUiState.asStateFlow()
+    private val _modelDetailsUiState = MutableStateFlow(ModelDetailsUiState())
+    val modelDetailsUiState: StateFlow<ModelDetailsUiState> = _modelDetailsUiState.asStateFlow()
     val messages: SnapshotStateList<ChatMessage> = mutableStateListOf()
 
     private val filePath: String =
@@ -151,7 +131,10 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
 
 
     private val stringStatusFlow = MutableSharedFlow<String>()
-    val errorFlow: SharedFlow<String> = stringStatusFlow.asSharedFlow()
+    private val errorFlow: SharedFlow<String> = stringStatusFlow.asSharedFlow()
+
+    private val applicationContext: Context = application.applicationContext
+    private val huggingFaceApiService = HuggingFaceApiService()
 
     /**
      * Initializes the [Pipeline] and related LLM helpers.
@@ -289,8 +272,23 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
 
         val chosen = ggufFiles.first()
+        logModelFileAccess(chosen)
         Log.i(VOICE_ASSISTANT_TAG, "Using GGUF model: ${chosen.absolutePath}")
         return chosen.absolutePath
+    }
+
+    private fun logModelFileAccess(file: File) {
+        val status = "exists=${file.exists()} isFile=${file.isFile} canRead=${file.canRead()} size=${file.length()}"
+        Log.d(VOICE_ASSISTANT_TAG, "Model file access check: ${file.absolutePath} ($status)")
+        runCatching {
+            file.inputStream().use { input ->
+                val buffer = ByteArray(16)
+                val read = input.read(buffer)
+                Log.d(VOICE_ASSISTANT_TAG, "Model file read probe: bytesRead=$read")
+            }
+        }.onFailure { e ->
+            Log.e(VOICE_ASSISTANT_TAG, "Model file read probe failed: ${file.absolutePath}", e)
+        }
     }
 
 
@@ -354,12 +352,12 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
 
         val summary = BenchmarkOverheadSummary(
-            javaEncodeTotalMs = llm.getLastBenchmarkJavaEncodeTotalMs(),
-            coreCppEncodeTotalMs = llm.getLastBenchmarkCoreCppEncodeTotalMs(),
-            encodeOverheadMs = llm.getLastBenchmarkEncodeOverheadMs(),
-            javaDecodeTotalMs = llm.getLastBenchmarkJavaDecodeLoopTotalMs(),
-            coreCppDecodeTotalMs = llm.getLastBenchmarkCoreCppDecodeTotalMs(),
-            decodeOverheadMs = llm.getLastBenchmarkDecodeOverheadMs()
+            javaEncodeTotalMs = llm.lastBenchmarkJavaEncodeTotalMs,
+            coreCppEncodeTotalMs = llm.lastBenchmarkCoreCppEncodeTotalMs,
+            encodeOverheadMs = llm.lastBenchmarkEncodeOverheadMs,
+            javaDecodeTotalMs = llm.lastBenchmarkJavaDecodeLoopTotalMs,
+            coreCppDecodeTotalMs = llm.lastBenchmarkCoreCppDecodeTotalMs,
+            decodeOverheadMs = llm.lastBenchmarkDecodeOverheadMs
         )
 
         return if (!summary.isValid) {
@@ -411,7 +409,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun onStartRecording() {
         runCatching {
-        // Reset state from previous run
+            // Reset state from previous run
             clearResponseText()
             _uiState.update { currentState ->
                 currentState.copy(
@@ -989,4 +987,330 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     fun clearTtsWarningMessage() {
         _uiState.update { it.copy(ttsWarningMessage = null) }
     }
+
+    fun downloadModelFile(model: HuggingFaceModel, filename: String) {
+        if (_downloadUiState.value.isRunning) {
+            return
+        }
+        val modelKey = "${model.id}/${model.modelId}"
+        updateDownloadUi {
+            it.copy(
+                canStart = false,
+                canCancel = true,
+                isRunning = true,
+                finishedOk = false,
+                currentFile = filename,
+                currentModelKey = modelKey,
+                fileProgress = 0,
+                done = 0,
+                total = 0
+            )
+        }
+        val modelInfo = model.copy(filename = filename)
+        Log.i(VOICE_ASSISTANT_TAG, "downloading... ${modelInfo.id} / ${modelInfo.modelId} / ${modelInfo.filename}")
+        val logger = LoggingProgressListener { event ->
+            when (event) {
+                is DownloadProgressEvent.Start -> {
+                    updateDownloadUi {
+                        it.copy(
+                            canStart = false,
+                            canCancel = true,
+                            isRunning = true,
+                            finishedOk = false,
+                            currentFile = event.fileName,
+                            currentModelKey = modelKey
+                        )
+                    }
+                }
+                is DownloadProgressEvent.Progress -> {
+                    val totalSafe =
+                        event.totalBytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 0
+                    val doneSafe = event.downloadedBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                    val progress = if (event.totalBytes != null && event.totalBytes > 0L) {
+                        ((event.downloadedBytes * 100) / event.totalBytes).toInt().coerceIn(0, 100)
+                    } else {
+                        -1
+                    }
+                    updateDownloadUi {
+                        it.copy(
+                            canStart = false,
+                            canCancel = true,
+                            isRunning = true,
+                            finishedOk = false,
+                            done = doneSafe,
+                            total = totalSafe,
+                            fileProgress = progress,
+                            currentFile = filename,
+                            currentModelKey = modelKey
+                        )
+                    }
+                }
+                is DownloadProgressEvent.Complete -> {
+                    updateDownloadUi {
+                        it.copy(
+                            canStart = true,
+                            canCancel = false,
+                            isRunning = false,
+                            finishedOk = true,
+                            fileProgress = 100,
+                            currentFile = null,
+                            currentModelKey = null
+                        )
+                    }
+                }
+                is DownloadProgressEvent.Error -> {
+                    updateDownloadUi {
+                        it.copy(
+                            canStart = true,
+                            canCancel = false,
+                            isRunning = false,
+                            finishedOk = false,
+                            currentFile = null,
+                            currentModelKey = null
+                        )
+                    }
+                }
+            }
+        }
+        huggingFaceApiService.startModelDownload(
+            scope = viewModelScope,
+            context = applicationContext,
+            modelInfo = modelInfo,
+            downloadPath = "$filePath/$llmFramework/${modelInfo.modelId}",
+            spec = ModelDownloadSpec(
+                url = modelInfo.uri.toString(),
+                fileName = filename,
+                sha256 = null
+            ),
+            listener = logger
+        )
+    }
+
+    /**
+     * Reads the expected model file extensions for the active framework from assets.
+     */
+    fun getExpectedModelExtensions(): List<String> {
+        val expected = runCatching {
+            val json = applicationContext.assets.open("models_query.json")
+                .bufferedReader()
+                .use { it.readText() }
+            val root = JSONObject(json)
+            root.optJSONObject(llmFramework)
+                ?.optJSONArray("expected_extension")
+        }.getOrNull()
+
+        val extensions = mutableListOf<String>()
+        if (expected != null) {
+            for (index in 0 until expected.length()) {
+                val value = expected.optString(index).trim()
+                if (value.isNotBlank()) {
+                    extensions.add(value)
+                }
+            }
+        }
+        Log.i(VOICE_ASSISTANT_TAG, "expected extensions: $extensions")
+        return extensions
+    }
+
+    /**
+     * Load models from HuggingFace
+     */
+    fun loadHuggingFaceModels() {
+        if (_modelListUiState.value.isLoading) {
+            return
+        }
+        _modelListUiState.update { it.copy(isLoading = true, error = null) }
+        viewModelScope.launch {
+            val result = huggingFaceApiService.listModels(
+                context = applicationContext,
+                framework = llmFramework
+            )
+            _modelListUiState.update { state ->
+                if (result.isSuccess) {
+                    state.copy(
+                        isLoading = false,
+                        models = result.getOrDefault(emptyList()),
+                        error = null
+                    )
+                } else {
+                    state.copy(
+                        isLoading = false,
+                        error = result.exceptionOrNull()?.message ?: FAILED_TO_LOAD_MODELS
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Loads available files for the selected model.
+     */
+    fun selectModelForDetails(model: HuggingFaceModel) {
+        _modelDetailsUiState.update {
+            it.copy(
+                isLoading = true,
+                selectedModel = model,
+                files = emptyList(),
+                error = null
+            )
+        }
+        viewModelScope.launch {
+            val result = huggingFaceApiService.listModelFiles(
+                context = applicationContext,
+                modelInfo = model
+            )
+            _modelDetailsUiState.update { state ->
+                if (result.isSuccess) {
+                    state.copy(
+                        isLoading = false,
+                        files = result.getOrDefault(emptyList()),
+                        error = null
+                    )
+                } else {
+                    state.copy(
+                        isLoading = false,
+                        error = result.exceptionOrNull()?.message ?: FAILED_TO_LOAD_MODELS
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Clears the currently selected model and its file listing.
+     */
+    fun clearSelectedModel() {
+        _modelDetailsUiState.update {
+            it.copy(
+                isLoading = false,
+                selectedModel = null,
+                files = emptyList(),
+                error = null
+            )
+        }
+    }
+
+    /**
+     * Cancels an active Hugging Face download and resets download UI state.
+     */
+    fun cancelModelDownload() {
+        huggingFaceApiService.cancelModelDownload(viewModelScope)
+        updateDownloadUi {
+            it.copy(
+                canStart = true,
+                canCancel = false,
+                isRunning = false,
+                finishedOk = false,
+                currentFile = null,
+                currentModelKey = null
+            )
+        }
+    }
+
+    /**
+     * Returns true when the given model file exists locally.
+     */
+    fun isModelFileDownloaded(model: HuggingFaceModel, filename: String): Boolean {
+        val modelDir = File(filePath, "$llmFramework/${model.modelId}")
+        return File(modelDir, filename).exists()
+    }
+
+    /**
+     * Deletes a downloaded model file (and any partial) from known model directories.
+     */
+    fun deleteModelFile(model: HuggingFaceModel, filename: String): Boolean {
+        val candidateDirs = listOf(
+            File(filePath, "$llmFramework/${model.modelId}"),
+            File(filePath, "$llmFramework/${model.id}/${model.modelId}")
+        )
+        var found = false
+        var ok = true
+        candidateDirs.forEach { dir ->
+            val file = File(dir, filename)
+            val partFile = File(dir, "$filename.part")
+            if (file.exists() || partFile.exists()) {
+                found = true
+            }
+            if (file.exists() && !file.delete()) {
+                ok = false
+            }
+            if (partFile.exists() && !partFile.delete()) {
+                ok = false
+            }
+            if (dir.exists() && (dir.listFiles()?.isEmpty() == true)) {
+                dir.delete()
+                dir.parentFile?.takeIf { parent ->
+                    parent.isDirectory && parent.listFiles()?.isEmpty() == true
+                }?.delete()
+            }
+        }
+        val deleted = if (found) ok else true
+        if (deleted) {
+            _modelDetailsUiState.update { state ->
+                state.copy(refreshKey = state.refreshKey + 1)
+            }
+        }
+        return deleted
+    }
+
+    /**
+     * Helper to update the download UI state atomically.
+     */
+    private fun updateDownloadUi(update: (DownloadUiState) -> DownloadUiState) {
+        _downloadUiState.update(update)
+    }
+
+    /**
+     * Imports a model file selected by the user into the app's LLM models folder.
+     * @param uri The [Uri] of the model selected by the user.
+     */
+    fun importModel(uri: Uri) {
+        Log.i(VOICE_ASSISTANT_TAG, "importing model: ${uri.path}")
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val inputStream = contentResolver.openInputStream(uri)
+                val filename = resolveDisplayName(uri)
+                val destDir = File(filePath, llmFramework)
+                val destDir2 = File(destDir, resolveDisplayNameWithoutExtension(uri))
+                if (!destDir2.mkdirs()) {
+                    Log.i(VOICE_ASSISTANT_TAG, "Failed to create destination directory: $destDir2")
+                }
+
+                val originalResFile = File(destDir2, filename)
+                try {
+                    val outputStream = FileOutputStream(originalResFile)
+                    inputStream?.copyTo(outputStream)
+                    val messageText = "Imported model to directory: $destDir2"
+                    Log.i(VOICE_ASSISTANT_TAG, messageText)
+                    ToastService.showToast(messageText)
+                } catch (e : Exception) {
+                    Log.e(VOICE_ASSISTANT_TAG, "Local model import failed: $e")
+                }
+            }
+        }
+    }
+
+    private fun resolveDisplayName(uri: Uri): String? {
+        fun withLocalPrefix(name: String): String {
+            return if (name.startsWith("local_")) name else "local_$name"
+        }
+
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex != -1 && cursor.moveToFirst()) {
+               return withLocalPrefix(cursor.getString(nameIndex))
+            }
+        }
+        return uri.lastPathSegment?.let(::withLocalPrefix)
+    }
+
+    /**
+     * Returns the resolved display name without its file extension, if present.
+     */
+    private fun resolveDisplayNameWithoutExtension(uri: Uri): String? {
+        val displayName = resolveDisplayName(uri) ?: return null
+        val lastDotIndex = displayName.lastIndexOf('.')
+        return if (lastDotIndex > 0) displayName.substring(0, lastDotIndex) else displayName
+    }
+
 }

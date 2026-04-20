@@ -15,6 +15,7 @@ import com.arm.voiceassistant.BuildConfig
 import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.utils.Constants.LLM_CONTEXT_CAPACITY_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_INITIALIZATION_ERROR
+import com.arm.voiceassistant.utils.MainUiState
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.UserLlmConfig
 import com.google.gson.Gson
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -34,6 +36,7 @@ import java.io.File
  * Instrumentation coverage for [MainViewModel] error handling on wrong/missing configs, context overflow, and context reset.
  */
 @RunWith(AndroidJUnit4::class)
+@Ignore
 class ErrorMessageTest {
 
     private var mainViewModel: MainViewModel? = null

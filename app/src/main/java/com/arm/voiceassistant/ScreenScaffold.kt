@@ -6,21 +6,18 @@
 
 package com.arm.voiceassistant
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,13 +25,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.arm.voiceassistant.ui.composables.TopBar
 import com.arm.voiceassistant.ui.screens.BenchmarkScreen
-import com.arm.voiceassistant.ui.screens.MainScreen
 import com.arm.voiceassistant.ui.screens.ModeSelectionScreen
+import com.arm.voiceassistant.ui.composables.TopBar
+import com.arm.voiceassistant.ui.screens.MainScreen
 import com.arm.voiceassistant.viewmodels.MainViewModel
 import com.arm.voiceassistant.viewmodels.ViewModelProvider
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import androidx.compose.animation.Crossfade
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.tooling.preview.Preview
+import com.arm.voiceassistant.ui.screens.DownloadScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -54,12 +57,11 @@ private fun ChatLoadingScreen(modifier: Modifier = Modifier) {
 private enum class AppMode {
     ModeSelection,
     Chat,
-    Benchmark
+    Benchmark,
+    ModelDownload
 }
-
 /**
  * Top-level scaffold that sets up the main app structure.
- *
  * @param snackbarHostState Host state for showing snackbars
  * @param mainViewModel Shared ViewModel passed to navigation and top bar
  * @return The provided or created [MainViewModel] instance
@@ -75,6 +77,9 @@ fun screenScaffold(
     var appMode by remember { mutableStateOf(AppMode.ModeSelection) }
     var previousMode by remember { mutableStateOf(AppMode.ModeSelection) }
 
+    // Gate to avoid showing Chat until pipeline is ready
+    var chatReady by remember { mutableStateOf(false) }
+
     LaunchedEffect(uiState.ttsWarningMessage) {
         uiState.ttsWarningMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -82,26 +87,32 @@ fun screenScaffold(
         }
     }
 
-    // Transition handling using switch/when
     LaunchedEffect(appMode) {
-        when (appMode) {
-            AppMode.ModeSelection -> {
-                if (previousMode == AppMode.Chat) {
-                    mainViewModel.shutdownPipeline()
-                }
-            }
-
-            AppMode.Benchmark -> {
-                if (previousMode == AppMode.Chat) {
-                    runCatching { mainViewModel.llmBridge.cancel() }
-                    mainViewModel.cancelPipeline()
-                }
-            }
-
-            AppMode.Chat -> {
-                // Entering Chat init is handled inside ChatScaffold.
-            }
+        // Leaving Chat
+        if (previousMode == AppMode.Chat && appMode == AppMode.ModeSelection) {
+            mainViewModel.shutdownPipeline()
         }
+
+        if (previousMode == AppMode.Chat && appMode == AppMode.Benchmark) {
+            runCatching { mainViewModel.llmBridge.cancel() }
+            mainViewModel.cancelPipeline()
+        }
+
+        // Entering Chat: show loader, reinit pipeline, then show chat
+        if (appMode == AppMode.Chat && previousMode != AppMode.Chat) {
+            chatReady = false
+
+            // Important: run heavy init off the main thread (prevents animation jank)
+            withContext(Dispatchers.Default) {
+                mainViewModel.reinitializePipelineForChat()
+            }
+
+            chatReady = true
+        }
+
+        // If you come back to ModeSelection / Benchmark, no need to keep chatReady=true
+        if (appMode != AppMode.Chat) chatReady = false
+
         previousMode = appMode
     }
 
@@ -118,9 +129,9 @@ fun screenScaffold(
         },
         topBar = {
             if (appMode != AppMode.ModeSelection) {
-                Box(
+                Column(
                     modifier = Modifier.background(color = MaterialTheme.colorScheme.secondary),
-                    contentAlignment = Alignment.Center
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     TopBar(
                         modifier = Modifier,
@@ -135,26 +146,51 @@ fun screenScaffold(
         }
     ) { padding ->
 
+        // Cheap transition (fade). No slide/size transforms => much less â€œdistractionâ€
         Crossfade(
             targetState = appMode,
             label = "screen_fade"
         ) { mode ->
             when (mode) {
-                AppMode.ModeSelection -> ModeSelectionScaffold(
-                    padding = padding,
+                AppMode.ModeSelection -> ModeSelectionScreen(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
                     onChatSelected = { appMode = AppMode.Chat },
-                    onBenchmarkSelected = { appMode = AppMode.Benchmark }
+                    onBenchmarkSelected = { appMode = AppMode.Benchmark },
+                    onModelDownloadSelected = { appMode = AppMode.ModelDownload }
                 )
 
-                AppMode.Chat -> ChatScaffold(
-                    padding = padding,
-                    mainViewModel = mainViewModel,
-                    snackbarHostState = snackbarHostState
+                AppMode.Chat -> {
+                    if (!chatReady) {
+                        ChatLoadingScreen(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                        )
+                    } else {
+                        MainScreen(
+                            viewModel = mainViewModel,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
+                }
+
+                AppMode.Benchmark -> BenchmarkScreen(
+                    viewModel = mainViewModel,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
                 )
 
-                AppMode.Benchmark -> BenchmarkScaffold(
-                    padding = padding,
-                    mainViewModel = mainViewModel
+                AppMode.ModelDownload -> DownloadScreen(
+                    viewModel = mainViewModel,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
                 )
             }
         }
@@ -174,14 +210,16 @@ fun screenScaffold(
 private fun ModeSelectionScaffold(
     padding: PaddingValues,
     onChatSelected: () -> Unit,
-    onBenchmarkSelected: () -> Unit
+    onBenchmarkSelected: () -> Unit,
+    onModelDownloadSelected: () -> Unit
 ) {
     ModeSelectionScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding),
         onChatSelected = onChatSelected,
-        onBenchmarkSelected = onBenchmarkSelected
+        onBenchmarkSelected = onBenchmarkSelected,
+        onModelDownloadSelected = onModelDownloadSelected
     )
 }
 

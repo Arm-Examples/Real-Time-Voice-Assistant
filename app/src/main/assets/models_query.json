@@ -1,0 +1,37 @@
+{
+  "llama.cpp":
+  {
+    "query": {
+      "sort": "downloads",
+      "private": "false",
+      "library": "GGUF",
+      "author": "ggml-org",
+      "pipeline_tag": "text-generation",
+      "num_parameters": "min:0,max:2B",
+      "limit": "20"
+    },
+    "expected_extension" : [".gguf" ]
+  },
+  "mnn" :
+  {
+    "query": {
+      "sort": "downloads",
+      "private": "false",
+      "author": "taobao-mnn",
+      "other": "chat",
+      "limit": "20"
+    },
+    "expected_extension" : [ ".mnn", ".bin",".weight", ".txt", ".json" ]
+  },
+  "onnxruntime-genai" :
+  {
+    "query": {
+      "sort": "downloads",
+      "author": "microsoft",
+      "pipeline_tag": "text-generation",
+      "library": "ONNX",
+      "limit": "20"
+    },
+    "expected_extension" : [".onnx", ".bin", ".weight", ".txt", ".json" ]
+  }
+}

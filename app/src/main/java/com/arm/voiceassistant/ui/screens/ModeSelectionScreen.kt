@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -94,6 +95,10 @@ private fun StaggerIn(
     }
 }
 
+private const val chatButtonText = "Chat"
+private const val benchmarkButtonText = "Benchmark"
+private const val downloadModelsButtonText = "Download models"
+
 /**
  * Screen allowing the user to select the application mode.
  *
@@ -103,12 +108,14 @@ private fun StaggerIn(
  * @param modifier Optional modifier for layout customization
  * @param onChatSelected Callback invoked when Chat mode is selected
  * @param onBenchmarkSelected Callback invoked when Benchmark mode is selected
+ * @param onModelDownloadSelected Callback invoked when models download mode is selected
  */
 @Composable
 fun ModeSelectionScreen(
     modifier: Modifier = Modifier,
     onChatSelected: () -> Unit,
-    onBenchmarkSelected: () -> Unit
+    onBenchmarkSelected: () -> Unit,
+    onModelDownloadSelected: () -> Unit
 ) {
     var start by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { start = true }
@@ -158,10 +165,10 @@ fun ModeSelectionScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.Chat,
-                        contentDescription = "Chat"
+                        contentDescription = chatButtonText
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Chat")
+                    Text(chatButtonText)
                 }
             }
 
@@ -175,10 +182,27 @@ fun ModeSelectionScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Speed,
-                        contentDescription = "Benchmark"
+                        contentDescription = benchmarkButtonText
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Benchmark")
+                    Text(benchmarkButtonText)
+                }
+            }
+
+            StaggerIn(visible = start, index = 3) {
+                FilledTonalButton(
+                    onClick = onModelDownloadSelected,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Download,
+                        contentDescription = downloadModelsButtonText
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(downloadModelsButtonText)
                 }
             }
         }
@@ -194,7 +218,8 @@ private fun ModeSelectionScreenPreview() {
     VoiceAssistantTheme {
         ModeSelectionScreen(
             onChatSelected = {},
-            onBenchmarkSelected = {}
+            onBenchmarkSelected = {},
+            onModelDownloadSelected = {}
         )
     }
 }

@@ -31,13 +31,15 @@ class ModeSelectionScreenUITest {
      */
     private fun setModeSelectionContent(
         onChatSelected: () -> Unit = {},
-        onBenchmarkSelected: () -> Unit = {}
+        onBenchmarkSelected: () -> Unit = {},
+        onModelDownloadSelected: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             VoiceAssistantTheme {
                 ModeSelectionScreen(
                     onChatSelected = onChatSelected,
-                    onBenchmarkSelected = onBenchmarkSelected
+                    onBenchmarkSelected = onBenchmarkSelected,
+                    onModelDownloadSelected = onModelDownloadSelected
                 )
             }
         }

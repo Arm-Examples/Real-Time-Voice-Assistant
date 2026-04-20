@@ -20,6 +20,7 @@ object Constants {
     const val EOS = "<eos>"
     const val NEXT_MESSAGE = "</NextMessage>"
 
+
     const val MARKDOWN_CODE = "```"
 
     const val STT_MODEL_NAME = "model.bin"
@@ -45,4 +46,13 @@ object Constants {
     const val AUD_REC_SAVE_FAILED = "Failed to save audio recording."
     const val SME_ENABLED_THREADS_CONFIG_WARNING = "SME features available on device. " +
             "Recommended threads may differ."
+
+    const val HUGGING_FACE_CONNECTION_TIMEOUT = 10_000
+    const val HUGGING_FACE_HOST = "https://huggingface.co/"
+    const val HUGGING_FACE_HEADERS_JSON =
+        """{"Accept":"application/json","Accept-Encoding":"identity","User-Agent":"curl/8.0.1"}"""
+
+
+    const val FAILED_TO_LOAD_MODELS = "Failed to load models."
+    const val FAILED_TO_LIST_MODEL_FILES = "Failed to list model files."
 }

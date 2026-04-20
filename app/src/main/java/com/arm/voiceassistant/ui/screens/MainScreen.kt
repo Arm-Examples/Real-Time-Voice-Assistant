@@ -114,10 +114,11 @@ fun MainScreen(
         )
     }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) viewModel.onStartRecording()
-        else viewModel.onError(Constants.RECORD_PERMISSION_ERROR)
-    }
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) viewModel.onStartRecording()
+            else viewModel.onError(Constants.RECORD_PERMISSION_ERROR)
+        }
 
     val background = if (isSystemInDarkTheme()) {
         Modifier.background(color = MaterialTheme.colorScheme.primary)
@@ -188,18 +189,27 @@ fun MainScreen(
                     ) {
                         items(messages) { message ->
                             when (message) {
-                                is ChatMessage.UserText -> MessageItem(label = "User", isUser = true) {
+                                is ChatMessage.UserText -> MessageItem(
+                                    label = "User",
+                                    isUser = true
+                                ) {
                                     Column(horizontalAlignment = Alignment.End) {
                                         UserBubble(text = message.text)
                                         message.timing?.let { UserTimingFooter(it) }
                                     }
                                 }
 
-                                is ChatMessage.UserImage -> MessageItem(label = "User", isUser = true) {
+                                is ChatMessage.UserImage -> MessageItem(
+                                    label = "User",
+                                    isUser = true
+                                ) {
                                     UserImageBubble(uri = message.uri)
                                 }
 
-                                is ChatMessage.AssistantText -> MessageItem(label = "Voice Assistant", isUser = false) {
+                                is ChatMessage.AssistantText -> MessageItem(
+                                    label = "Voice Assistant",
+                                    isUser = false
+                                ) {
                                     Column {
                                         AssistantBubble(text = message.text)
                                         message.timing?.let { AssistantDecodeFooter(it) }
@@ -232,7 +242,7 @@ fun MainScreen(
                     showImageButton = viewModel.imageUploadEnabled
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
