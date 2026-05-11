@@ -1,10 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-val validLLMFrameworks = listOf("llama.cpp", "onnxruntime-genai", "mnn" ,"mediapipe")
+val validLLMFrameworks = listOf("llama.cpp", "onnxruntime-genai", "mnn", "mediapipe", "executorch")
 
 // Get the user-defined LLM framework from CLI (-PllmFramework=...) or gradle.properties
 val llmFramework: String = project.findProperty("llmFramework").toString()

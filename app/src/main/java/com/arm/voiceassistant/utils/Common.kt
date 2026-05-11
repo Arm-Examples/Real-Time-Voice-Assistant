@@ -122,6 +122,69 @@ object Utils {
     const val KIB_PER_GIB = 1024.0 * 1024.0
     const val BYTES_PER_GIB = 1024.0 * 1024.0 * 1024.0
 
+    /**
+     * Resolve the model path from the selected framework + model folder.
+     *
+     * - `executorch`: resolves a `.pte` file under `<filePath>/executorch/<modelName>/`
+     * - `llama.cpp`: resolves a non-projection `.gguf` file under `<filePath>/llama.cpp/<modelName>/`
+     * - others: returns framework folder path `<filePath>/<llmFramework>/<modelName>/`
+     *
+     * @param filePath Base directory containing model framework folders.
+     * @param llmFramework Selected framework name.
+     * @param modelName Model name from the UI.
+     * @return Resolved model path (file or directory), or null if required file is not found.
+     */
+    fun resolveModelPath(filePath: String, llmFramework: String, modelName: String): String? {
+        val frameworkConfig = when (llmFramework) {
+            "executorch" -> FrameworkModelConfig("executorch", "pte", "ExecuTorch")
+            "llama.cpp" -> FrameworkModelConfig("llama.cpp", "gguf", "GGUF") { f ->
+                f.name.contains("proj", ignoreCase = true)
+            }
+            else -> return "$filePath/$llmFramework/$modelName/"
+        }
+
+        val frameworkRoot = File(filePath, frameworkConfig.frameworkDir)
+        val modelDir = File(frameworkRoot, modelName)
+
+        if (!modelDir.exists() || !modelDir.isDirectory) {
+            val msg = "Model folder not found for \"$modelName\""
+            Log.e(VOICE_ASSISTANT_TAG, msg + ": ${modelDir.absolutePath}")
+            ToastService.showToast(msg)
+            return null
+        }
+
+        val modelFiles = modelDir.listFiles { f ->
+            f.isFile &&
+                    f.extension.equals(frameworkConfig.extension, ignoreCase = true) &&
+                    !frameworkConfig.excludePredicate(f)
+        }?.toList() ?: emptyList()
+
+        if (modelFiles.isEmpty()) {
+            val msg = "No compatible .${frameworkConfig.extension} model found for \"$modelName\""
+            Log.e(VOICE_ASSISTANT_TAG, msg + " in ${modelDir.absolutePath}")
+            ToastService.showToast(msg)
+            return null
+        }
+
+        if (modelFiles.size > 1) {
+            Log.w(
+                VOICE_ASSISTANT_TAG,
+                "Multiple .${frameworkConfig.extension} files found for \"$modelName\" in ${modelDir.absolutePath}; using ${modelFiles.first().name}"
+            )
+        }
+
+        val chosen = modelFiles.first()
+        Log.i(VOICE_ASSISTANT_TAG, "Using ${frameworkConfig.modelTypeLabel} model: ${chosen.absolutePath}")
+        return chosen.absolutePath
+    }
+
+    private data class FrameworkModelConfig(
+        val frameworkDir: String,
+        val extension: String,
+        val modelTypeLabel: String,
+        val excludePredicate: (File) -> Boolean = { false }
+    )
+
     data class ChatConfig(
         val systemPrompt: String,
         val applyDefaultChatTemplate: Boolean,
@@ -205,6 +268,14 @@ object Utils {
                 userTemplate = "\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:"
                 batchSize = 1
                 applyDefaultChatTemplate = true
+            }
+            "executorch" -> {
+                llmModelName = "executorch/llama-3.2-1b/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte"
+                stopWords = stopWords.plus("endoftext")
+                isVision = false
+                systemTemplate = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n%s<|eot_id|>\n"
+                userTemplate = "<|start_header_id|>user<|end_header_id|>\n%s<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
+                batchSize = 256
             }
         }
             modelPointer = "$modelPath/$llmModelName"
@@ -501,6 +572,7 @@ object Utils {
             "onnxruntime-genai" -> "onnxrtTextConfig-phi-4.json"
             "mnn"               -> "mnnVisionConfig-qwen2.5-3B.json"
             "mediapipe"         -> "mediapipeTextConfig-gemma-2B.json"
+            "executorch"        -> "executorchTextConfig-llama-3.2-1B.json"
             else -> "llamaVisionConfig-qwen2-vl-2B.json"
         }
     }

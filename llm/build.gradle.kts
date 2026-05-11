@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ * SPDX-FileCopyrightText: Copyright 2024-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -15,8 +15,8 @@ android {
     defaultConfig {
         externalNativeBuild {
             cmake {
-                targets += "arm-llm-jni"
-                targets += "arm-llm-jni-stage-shared-libraries"
+                targets += "llm-jni"
+                targets += "llm-jni-stage-shared-libraries"
 
                 val llmFramework = rootProject.extensions.extraProperties.get("LLM_FRAMEWORK") as String
                 logger.lifecycle("Using LLM framework: $llmFramework")

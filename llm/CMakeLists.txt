@@ -13,7 +13,7 @@ project(llm-module
 include(FetchContent)
 
 set(LLM_MODULE_GIT_URL "https://github.com/Arm-Examples/LLM-Runner.git")
-set(LLM_MODULE_GIT_SHA "f12fbb4e5516d2cd9af336f260d37d1a39b25ec2")
+set(LLM_MODULE_GIT_SHA "6e2a1f521337b443358e44207cf835837fed3112")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
 
 FetchContent_Declare(
@@ -33,12 +33,12 @@ FetchContent_MakeAvailable(llmModule)
 if (DEFINED ANDROID_ABI)
    set(SHARED_LIBS_STAGED_DIR "${CMAKE_SOURCE_DIR}/build/staged/${ANDROID_ABI}")
 
-   add_custom_target(arm-llm-jni-stage-shared-libraries ALL
+   add_custom_target(llm-jni-stage-shared-libraries ALL
            COMMAND ${CMAKE_COMMAND} -E echo "Staging llama.cpp arch-variant shared libs"
            COMMAND ${CMAKE_COMMAND} -E make_directory "${SHARED_LIBS_STAGED_DIR}"
            COMMAND ${CMAKE_COMMAND} -E copy_directory
            "${CMAKE_BINARY_DIR}/lib" "${SHARED_LIBS_STAGED_DIR}"
            COMMENT "Copying shared libs to ${SHARED_LIBS_STAGED_DIR}"
    )
-   add_dependencies(arm-llm-jni-stage-shared-libraries arm-llm-jni)
+   add_dependencies(llm-jni-stage-shared-libraries llm-jni)
 endif()

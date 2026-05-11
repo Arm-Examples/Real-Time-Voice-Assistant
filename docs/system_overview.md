@@ -86,6 +86,7 @@ The LLM backend is chosen at build time via the `llmFramework` [Gradle property]
 - `onnxruntime-genai`
 - `mnn`
 - `mediapipe`
+- `executorch`
 
 Example:
 
