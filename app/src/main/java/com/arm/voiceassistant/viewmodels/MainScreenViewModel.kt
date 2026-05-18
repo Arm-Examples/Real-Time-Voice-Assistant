@@ -43,6 +43,7 @@ import com.arm.voiceassistant.utils.Timer
 import com.arm.voiceassistant.utils.TimingStats
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.responseComplete
+import com.arm.voiceassistant.utils.Utils.resolveModelPath
 import com.arm.voiceassistant.utils.ToastService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -253,51 +254,9 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     }
 
     /**
-     * Find a GGUF model file for llama.cpp using the given model key.
-     *
-     * Looks under:
-     *   <filePath>/llama.cpp/<modelKey>/
-     *
-     * The directory is scanned for `.gguf` files (projector models are ignored).
-     * The first file in sorted order is selected.
-     *
-     * @param modelKey Model name from the UI.
-     * @return Absolute path to the selected `.gguf` file, or null if none is found.
-     */
-    private fun resolveLlamaModelPath(modelKey: String): String? {
-        val llamaRoot = File(filePath, "llama.cpp")
-        val modelDir = File(llamaRoot, modelKey)
-
-        if (!modelDir.exists() || !modelDir.isDirectory) {
-            val msg = "Model folder not found for \"$modelKey\""
-            Log.e(VOICE_ASSISTANT_TAG, msg + ": ${modelDir.absolutePath}")
-            showToast(msg)
-            return null
-        }
-
-        val ggufFiles = modelDir.listFiles { f ->
-            f.isFile &&
-                    f.extension.equals("gguf", ignoreCase = true) &&
-                    !f.name.contains("proj", ignoreCase = true)
-        }?.sortedBy { it.name } ?: emptyList()
-
-        if (ggufFiles.isEmpty()) {
-            val msg = "No compatible .gguf model found for \"$modelKey\""
-            Log.e(VOICE_ASSISTANT_TAG, msg + " in ${modelDir.absolutePath}")
-            showToast(msg)
-            return null
-        }
-
-        val chosen = ggufFiles.first()
-        Log.i(VOICE_ASSISTANT_TAG, "Using GGUF model: ${chosen.absolutePath}")
-        return chosen.absolutePath
-    }
-
-
-    /**
      * Run the native LLM benchmark with the selected configuration.
      *
-     * @param modelKey Logical model name from UI (e.g. "llama-3.2", "phi-2").
+     * @param modelName Logical model name from UI (e.g. "llama-3.2", "phi-2").
      * @param inputTokens Number of input tokens for the synthetic prompt.
      * @param outputTokens Number of tokens to generate during decode.
      * @param contextSize Context length in tokens (must exceed input + output tokens).
@@ -307,7 +266,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      * @return 0 on success, non-zero on failure.
      */
     fun runBenchmark(
-        modelKey: String,
+        modelName: String,
         inputTokens: Int,
         outputTokens: Int,
         contextSize: Int,
@@ -315,14 +274,10 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         iterations: Int,
         warmup: Int = 1
     ): Int {
-        val modelPath: String? = if (llmFramework == "llama.cpp") {
-            resolveLlamaModelPath(modelKey)
-        } else {
-            "$filePath/$llmFramework/$modelKey/"
-        }
+        val modelPath: String? = resolveModelPath(filePath, llmFramework, modelName)
 
         if (modelPath == null) {
-            onError(MODEL_NOT_FOUND_ERROR.format(modelKey))
+            onError(MODEL_NOT_FOUND_ERROR.format(modelName))
             return -1
         }
 

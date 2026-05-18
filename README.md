@@ -147,6 +147,7 @@ Available options:
 * `onnxruntime-genai`
 * `mnn`
 * `mediapipe`
+* `executorch`
 
 You can specify the framework when building the app from the command line:
 > ./gradlew assembleRelease -PllmFramework=onnxruntime-genai
@@ -173,6 +174,7 @@ Details on custom LLM configuration can be found in the links below:
 [Custom configuration of mnn](https://github.com/Arm-Examples/LLM-Runner#mnn-model)
 
 [Custom configuration of mediapipe](https://github.com/Arm-Examples/LLM-Runner#mediapipe-model)
+
 
 
 ## Custom STT Configuration
