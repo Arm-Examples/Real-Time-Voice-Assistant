@@ -899,7 +899,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             val originalResFile = File(filePath, filename)
             val outputStream = FileOutputStream(originalResFile)
             inputStream?.copyTo(outputStream)
-            pipeline.addImageToLLmDialog(originalResFile, tmpFilePath.absolutePath)
+            pipeline.addImageToLLmDialog(originalResFile)
             _uiState.update { currentState ->
                 currentState.copy(imagePath = originalResFile.absolutePath)
             }

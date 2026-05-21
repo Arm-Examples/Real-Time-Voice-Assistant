@@ -201,10 +201,7 @@ class ErrorMessageTest {
             var circuitBreaker = 0
             mainViewModel?.llm?.chatProgress?.let {
                 while (it < 100) {
-                    mainViewModel?.pipeline?.addImageToLLmDialog(
-                        imageFile,
-                        tempDirPath = tmpDirPath.toString()
-                    )
+                    mainViewModel?.pipeline?.addImageToLLmDialog(imageFile)
                     mainViewModel?.pipeline?.generateResponseTokens(question)
 
                     if (mainUiState?.value?.error?.state == true) {
