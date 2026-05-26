@@ -6,8 +6,6 @@
  */
 
 package com.arm.voiceassistant
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.arm.Llm
@@ -47,7 +45,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 
 
 /** Main processing pipeline that coordinates STT, LLM, and TTS components.
@@ -452,20 +449,16 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
     }
 
     /**
-     * Takes the original image, and resizes it to the config spec, and passes it to the LLM instance
-     * @param originalResImage The original image at its original res
-     * @param tempDirPath The path to the temp directory
+     * Passes the original image to the LLM instance.
+     * The LLM wrapper handles any model-specific image resizing during encoding.
+     * @param originalResImage The original image at its original resolution.
      */
-    fun addImageToLLmDialog(originalResImage: File, tempDirPath: String) {
+    fun addImageToLLmDialog(originalResImage: File) {
         runCatching {
-            // Max size of the larger Dim of an image, should handle both portrait and landscape images
-            val maxDim = this.llm.maxInputImageDim
-            val tempDirectoryFile = File(tempDirPath)
-
-            val resizedImageFile = resizeImage(originalResImage, maxDim, tempDirectoryFile)
-            if (resizedImageFile != null) {
-                this.llm.setImageLocation(resizedImageFile.absolutePath)
+            if (!originalResImage.exists() || !originalResImage.canRead()) {
+                throw IllegalArgumentException("Image file does not exist or cannot be read: ${originalResImage.path}")
             }
+            this.llm.setImageLocation(originalResImage.absolutePath)
             Log.i(VOICE_ASSISTANT_TAG, "file location is ${originalResImage.absolutePath}")
 
             lastImageEncodeJob = llmScope.launch {
@@ -481,48 +474,5 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
             Log.e(VOICE_ASSISTANT_TAG, LLM_IMAGE_ADD_ERROR, e)
             throw RuntimeException(LLM_IMAGE_ADD_ERROR)
         }
-    }
-
-    /**
-     * Resizes the given image file to fit within a maximum dimension
-     * @param displayedImage The original image file to be resized.
-     * @param maxDim The maximum width or height (whichever is larger) of the resized image.
-     * @param tmpFileDir The directory where the resized temporary image file will be saved.
-     * @return A temporary file containing the resized JPEG image.
-     */
-    private fun resizeImage(
-        displayedImage: File,
-        maxDim: Int,
-        tmpFileDir: File
-    ): File? {
-        if (!displayedImage.exists() || !displayedImage.canRead()) {
-            Log.e("ImageResize", "File does not exist or cannot be read: ${displayedImage.path}")
-            return null
-        }
-
-        val decoded = BitmapFactory.decodeFile(displayedImage.absolutePath)
-        if (decoded == null) {
-            Log.e("ImageResize", "Failed to decode image: ${displayedImage.path}")
-            return null
-        }
-
-        if (decoded.width <= 0 || decoded.height <= 0) {
-            Log.e("ImageResize", "Invalid image dimensions: ${decoded.width}x${decoded.height}")
-            return null
-        }
-
-        val ratio = decoded.width.toFloat() / decoded.height
-
-        val (targetW, targetH) = if (decoded.width >= decoded.height) {
-            maxDim to (maxDim / ratio).toInt()
-        } else {
-            (maxDim * ratio).toInt() to maxDim
-        }
-        val resized: Bitmap = Bitmap.createScaledBitmap(decoded, targetW, targetH, true)
-        val tempFile = File.createTempFile("tmp", displayedImage.name, tmpFileDir)
-        FileOutputStream(tempFile).use { out ->
-            resized.compress(Bitmap.CompressFormat.JPEG, 100, out)
-        }
-        return tempFile
     }
 }
