@@ -9,8 +9,11 @@ package com.arm.voiceassistant
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +21,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -27,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arm.voiceassistant.ui.composables.TopBar
 import com.arm.voiceassistant.ui.screens.BenchmarkScreen
@@ -41,10 +47,24 @@ import kotlinx.coroutines.withContext
 /**
  * Fullscreen loading indicator shown while the chat pipeline is initializing.
  */
+@VisibleForTesting
 @Composable
-private fun ChatLoadingScreen(modifier: Modifier = Modifier) {
+internal fun ChatLoadingScreen(
+    modifier: Modifier = Modifier,
+    statusMessage: String? = null
+) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            if (!statusMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = statusMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
     }
 }
 
@@ -204,6 +224,7 @@ private fun ChatScaffold(
 ) {
     // Local to Chat only; gets reset automatically when leaving Chat (composable disposed)
     var chatReady by remember { mutableStateOf(false) }
+    val statusMessage by mainViewModel.statusMessage.collectAsState()
 
     LaunchedEffect(Unit) {
         chatReady = false
@@ -217,7 +238,8 @@ private fun ChatScaffold(
         ChatLoadingScreen(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(padding),
+            statusMessage = statusMessage
         )
     } else {
         MainScreen(

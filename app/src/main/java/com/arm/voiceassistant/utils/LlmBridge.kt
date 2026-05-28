@@ -7,15 +7,10 @@ package com.arm.voiceassistant.utils
 
 import kotlinx.coroutines.CancellableContinuation
 
-
 import android.util.Log
 import com.arm.Llm
 import java.util.concurrent.atomic.AtomicBoolean
 
-
-private const val RESULT_OK = 0
-private const val RESULT_CANCELLED = 1
-private const val RESULT_ERROR = 2
 
 sealed class NativeResult {
     data class Success(val data: String?) : NativeResult()

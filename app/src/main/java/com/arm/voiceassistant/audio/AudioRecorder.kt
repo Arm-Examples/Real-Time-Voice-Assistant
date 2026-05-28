@@ -33,7 +33,7 @@ class AudioRecorder(
 
     private val isRecording = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    val audioData = arrayListOf<Byte>()   // final WAV data buffer (header + PCM)
+    private val audioData = arrayListOf<Byte>()   // final WAV data buffer (header + PCM)
     private var recordingJob: Job? = null // job for the background recording coroutine
     private var rawAudio = ShortArray(0)
     private var rawAudioSize = 0
@@ -45,7 +45,7 @@ class AudioRecorder(
     private val bufferFrames: Int = bufferSizeBytes?.let {
         // ensure even number of bytes (each sample is 2 bytes)
         if (it % 2 != 0) (it / 2) + 1 else it / 2
-    } ?: bufElem2Rec  // default to predefined frames if not specified
+    } ?: DEFAULT_BUFFER_SIZE  // default to predefined frames if not specified
 
     /**
      * Start the recording and begin reading audio data in a background thread.
@@ -159,9 +159,6 @@ class AudioRecorder(
         audioData.addAll(audioBytes.toList())
         rawAudioSize = 0
     }
-    // Overloads for convenience:
-    fun stopRecording() = stopRecording(save = true)
-    fun cancelRecording() = stopRecording(save = false)
 
     /**
      * Release the underlying AudioRecord and associated resources.
@@ -272,7 +269,7 @@ class AudioRecorder(
         var pos = 0.0
         for (i in 0 until outputLength) {
             val index = pos.toInt()
-            val frac = pos - index  // fractional part for interpolation
+            val fractionalPart = pos - index  // fractional part for interpolation
             outputSamples[i] = if (index >= inputSamples.size - 1) {
                 // At end, use last sample
                 inputSamples[inputSamples.size - 1]
@@ -280,7 +277,7 @@ class AudioRecorder(
                 // Linear interpolate between adjacent samples
                 val sample1 = inputSamples[index]
                 val sample2 = inputSamples[index + 1]
-                val interpolated = sample1 + ((sample2 - sample1) * frac).toInt()
+                val interpolated = sample1 + ((sample2 - sample1) * fractionalPart).toInt()
                 interpolated.toShort()
             }
             pos += ratio
@@ -301,10 +298,6 @@ class AudioRecorder(
      * @param required The total number of samples that must fit in the buffer after appending.
      */
     private fun ensureRawCapacity(required: Int) {
-        // Initial allocation size for the PCM buffer (in samples).
-        // 4096 samples ≈ 256 ms at 16 kHz mono.
-        val INITIAL_PCM_BUFFER_SAMPLES = 4096
-
         if (rawAudio.size >= required) return
 
         var newCap = if (rawAudio.isEmpty()) {
@@ -350,7 +343,7 @@ class AudioRecorder(
         wavHeader[14] = 't'.code.toByte()
         wavHeader[15] = ' '.code.toByte()
 
-        // Subchunk1 size (PCM header size = 16)
+        // Chunk 1 size (PCM header size = 16)
         wavHeader[16] = 16
         wavHeader[17] = 0
         wavHeader[18] = 0
@@ -404,6 +397,9 @@ class AudioRecorder(
         const val BITS_PER_SAMPLE: Short = 16
         const val NUMBER_CHANNELS: Short = 1
         const val BYTE_RATE = SAMPLE_RATE * NUMBER_CHANNELS * BITS_PER_SAMPLE / 8
-        var bufElem2Rec = 1024  // default buffer size in samples (legacy default)
+        const val DEFAULT_BUFFER_SIZE = 1024  // default buffer size in samples (legacy default)
+        // Initial allocation size for the PCM buffer (in samples).
+        // 4096 samples ≈ 256 ms at 16 kHz mono.
+        const val INITIAL_PCM_BUFFER_SAMPLES = 4096
     }
 }

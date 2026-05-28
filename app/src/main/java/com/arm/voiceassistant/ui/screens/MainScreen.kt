@@ -55,7 +55,6 @@ fun MainScreen(
     val messages = viewModel.messages
     val listState = rememberLazyListState()
 
-    var currentToast by remember { mutableStateOf("") }
     var openConfirmationDialog by remember { mutableStateOf(false) }
     var openExitDialog by remember { mutableStateOf(false) }
 
@@ -66,12 +65,6 @@ fun MainScreen(
     LaunchedEffect(messages.size) {
         if (messages.isEmpty()) {
             messages.add(ChatMessage.AssistantText("Hi!\nI'm your AI assistant. How can I help you?"))
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.toastMessages.collect { message ->
-            currentToast = message
         }
     }
 

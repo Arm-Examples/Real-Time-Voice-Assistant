@@ -60,7 +60,13 @@ import java.io.FileInputStream
  *
  */
 
-class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: Boolean = false, private val sharedLibraryPath: String = "") : AutoCloseable {
+class Pipeline(
+    modelPath: String,
+    errorFlow: MutableSharedFlow<String>,
+    isTest: Boolean = false,
+    private val sharedLibraryPath: String = "",
+    private val statusReporter: ((String) -> Unit)? = null
+) : AutoCloseable {
     private var timers = PipelineTimers()                    // Various timers needed
     private val audioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -97,8 +103,11 @@ class Pipeline(modelPath: String, errorFlow: MutableSharedFlow<String>, isTest: 
             if(hasSME()) {
                 ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
             }
+            statusReporter?.invoke("Loading speech-to-text model...")
             initializeSTT(modelPath)
+            statusReporter?.invoke("Loading language model...")
             initializeLLM(modelPath)
+            statusReporter?.invoke("Finalizing setup...")
         }
     }
 
