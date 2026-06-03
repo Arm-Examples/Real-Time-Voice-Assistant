@@ -175,6 +175,8 @@ Details on custom LLM configuration can be found in the links below:
 
 [Custom configuration of mediapipe](https://github.com/Arm-Examples/LLM-Runner#mediapipe-model)
 
+[Custom configuration of executorch](https://github.com/Arm-Examples/LLM-Runner#executorch-model)
+
 
 
 ## Custom STT Configuration
