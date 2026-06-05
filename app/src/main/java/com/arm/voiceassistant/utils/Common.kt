@@ -261,14 +261,6 @@ object Utils {
                 userTemplate = "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
                 batchSize = 1
             }
-            "mediapipe" -> {
-                llmModelName = "mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite"
-                isVision = false
-                systemTemplate = "<start_of_turn>system:%s<end_of_turn>"
-                userTemplate = "\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:"
-                batchSize = 1
-                applyDefaultChatTemplate = true
-            }
             "executorch" -> {
                 llmModelName = "executorch/llama-3.2-1b/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte"
                 stopWords = stopWords.plus("endoftext")
@@ -571,7 +563,6 @@ object Utils {
             "llama.cpp"         -> "llamaVisionConfig-qwen2-vl-2B.json"
             "onnxruntime-genai" -> "onnxrtTextConfig-phi-4.json"
             "mnn"               -> "mnnVisionConfig-qwen2.5-3B.json"
-            "mediapipe"         -> "mediapipeTextConfig-gemma-2B.json"
             "executorch"        -> "executorchTextConfig-llama-3.2-1B.json"
             else -> "llamaVisionConfig-qwen2-vl-2B.json"
         }
