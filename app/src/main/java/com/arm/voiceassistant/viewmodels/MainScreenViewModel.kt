@@ -140,8 +140,8 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
     private var llmResponseGenerationJob: Job? = null
     var imageUploadEnabled: Boolean = false
 
-    private val _toastMessages = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
-    val toastMessages: SharedFlow<String> = _toastMessages
+    private val _statusMessage = MutableStateFlow<String?>(null)
+    val statusMessage: StateFlow<String?> = _statusMessage
     private val metricsUpdater = ChatMetricsUpdater(_uiState, messages)
 
     private var llmFramework = BuildConfig.LLM_FRAMEWORK
@@ -167,10 +167,18 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             }
         }
         runCatching {
-            pipeline = Pipeline(filePath, stringStatusFlow,isTest, sharedLibraryPath)
+            pipeline = Pipeline(
+                filePath,
+                stringStatusFlow,
+                isTest,
+                sharedLibraryPath
+            ) { message ->
+                _statusMessage.value = message
+            }
             llm = pipeline.llm
             llmBridge = LlmBridge(llm)
             imageUploadEnabled = pipeline.supportsImageInput()
+            _statusMessage.value = null
         }.onFailure { e ->
             Log.e(VOICE_ASSISTANT_TAG, "Failed to Initialize the pipeline :$e", e)
             onError(PIPELINE_INIT_ERROR)

@@ -62,7 +62,7 @@ fun <T> BaseDropdown(
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-                .menuAnchor()
+                .menuAnchor(MenuAnchorType.PrimaryEditable, enabled)
                 .fillMaxWidth()
                 .then(fieldTag?.let { Modifier.testTag(it) } ?: Modifier)
         )

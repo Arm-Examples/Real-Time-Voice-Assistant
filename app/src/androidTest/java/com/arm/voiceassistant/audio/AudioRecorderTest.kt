@@ -209,7 +209,7 @@ class AudioRecorderInstrumentedTest {
         val atomic = isRecordingField.get(audioRecorder) as java.util.concurrent.atomic.AtomicBoolean
         atomic.set(true)
 
-        audioRecorder.stopRecording()
+        audioRecorder.stopRecording(true)
 
         val audioDataField = AudioRecorder::class.java.getDeclaredField("audioData")
         audioDataField.isAccessible = true
