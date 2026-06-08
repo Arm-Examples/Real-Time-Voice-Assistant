@@ -28,6 +28,14 @@ object Constants {
 
     const val INITIAL_METRICS_VALUE = "0.00"
 
+    const val APP_TITLE = "Arm On-Device Assistant"
+    const val BUILD_INFO_TITLE = "Build Information"
+    const val BUILD_INFO_APP_REVISION_LABEL = "Application revision"
+    const val BUILD_INFO_KLEIDI_LABEL = "KleidiAI acceleration"
+    const val BUILD_INFO_LLM_FRAMEWORK_LABEL = "LLM framework used"
+    const val BUILD_INFO_LLM_REVISION_LABEL = "LLM revision"
+    const val BUILD_INFO_STT_REVISION_LABEL = "STT revision"
+
     // Recording related, in ms
     const val MIN_ALLOWED_RECORDING : Long = 1100
 

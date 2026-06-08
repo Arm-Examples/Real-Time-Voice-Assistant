@@ -49,11 +49,14 @@ var pipeline: Pipeline? = null
 @Composable
 fun TopBar(
     modifier: Modifier = Modifier,
+    title: String = "Arm On-Device Assistant",
     onBack: () -> Unit = {},
     resetUserText: () -> Unit = {},
     resetPerformanceMetrics: () -> Unit = {},
     toggleTTS: () -> Unit = {},
-    isTTSEnabled: Boolean = true
+    isTTSEnabled: Boolean = true,
+    showTtsToggle: Boolean = true,
+    showReset: Boolean = true
 ) {
     CenterAlignedTopAppBar(
         modifier = modifier.height(40.dp),
@@ -63,7 +66,7 @@ fun TopBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Arm On-Device Assistant",
+                    text = title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -83,23 +86,27 @@ fun TopBar(
             }
         },
         actions = {
-            TTSToggleButton(
-                isEnabled = isTTSEnabled,
-                onToggle = toggleTTS
-            )
-
-            IconButton(
-                onClick = {
-                    pipeline?.resetContext()
-                    resetUserText()
-                    resetPerformanceMetrics()
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Cached,
-                    contentDescription = "reset_context",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+            if (showTtsToggle) {
+                TTSToggleButton(
+                    isEnabled = isTTSEnabled,
+                    onToggle = toggleTTS
                 )
+            }
+
+            if (showReset) {
+                IconButton(
+                    onClick = {
+                        pipeline?.resetContext()
+                        resetUserText()
+                        resetPerformanceMetrics()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Cached,
+                        contentDescription = "reset_context",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
         }
     )
@@ -120,4 +127,3 @@ private fun TopBarPreview() {
         )
     }
 }
-
