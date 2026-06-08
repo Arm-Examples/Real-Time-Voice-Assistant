@@ -146,7 +146,6 @@ Available options:
 * `llama.cpp` (default)
 * `onnxruntime-genai`
 * `mnn`
-* `mediapipe`
 * `executorch`
 
 You can specify the framework when building the app from the command line:
@@ -155,9 +154,6 @@ You can specify the framework when building the app from the command line:
 If no value is provided, the default is used.
 > **NOTE**: The default value is defined in [gradle properties](gradle.properties) and can be modified
 > if a different framework is preferred by default.
-
-> **NOTE**: MediaPipe™ support is only for limited models. Please set your [Hugging Face](https://huggingface.co/) access token in your `.netrc` file.
-> Refer to the [custom configuration of mediapipe](https://github.com/Arm-Examples/LLM-Runner#mediapipe-model) for more details.
 
 Details on supported LLM models can be found [here](https://github.com/Arm-Examples/LLM-Runner#supported-models).
 
@@ -172,8 +168,6 @@ Details on custom LLM configuration can be found in the links below:
 [Custom configuration of onnxruntime-genai](https://github.com/Arm-Examples/LLM-Runner#onnxruntime-genai-model)
 
 [Custom configuration of mnn](https://github.com/Arm-Examples/LLM-Runner#mnn-model)
-
-[Custom configuration of mediapipe](https://github.com/Arm-Examples/LLM-Runner#mediapipe-model)
 
 [Custom configuration of executorch](https://github.com/Arm-Examples/LLM-Runner#executorch-model)
 
@@ -238,7 +232,7 @@ The Real Time Voice Assistant project welcomes contributions. For more details o
 
 * Arm® and KleidiAI™ are registered trademarks or trademarks of Arm® Limited (or its subsidiaries) in the US and/or
   elsewhere.
-* MediaPipe™ and Android™ are trademarks of Google LLC.
+* Android™ is a trademark of Google LLC.
 
 ## License
 

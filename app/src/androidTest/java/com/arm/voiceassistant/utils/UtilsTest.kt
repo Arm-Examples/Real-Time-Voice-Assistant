@@ -42,11 +42,11 @@ class UtilsTest {
           "chat" : {
             "systemPrompt" : "You are a helpful and factual AI assistant named Orbita. Orbita answers with maximum of two sentences.",
             "applyDefaultChatTemplate" : true,
-            "systemTemplate" : "<start_of_turn>system:%s<end_of_turn>",
-            "userTemplate"   : "\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:"
+            "systemTemplate" : "<|system|>%s<|end|>",
+            "userTemplate"   : "<|user|>%s<|end|><|assistant|>"
           },
           "model" : {
-            "llmModelName" : "mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite",
+            "llmModelName" : "onnxruntime-genai/phi-4-mini",
             "isVision" : false
           },
           "runtime" : {
@@ -141,8 +141,8 @@ class UtilsTest {
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
 
         // Structure/values
-        assertEquals("$modelPath/mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite", llmConfig.model.llmModelName)
-        assertEquals("\n<start_of_turn>user:%s<end_of_turn>\n<start_of_turn>model:", llmConfig.chat.userTemplate)
+        assertEquals("$modelPath/onnxruntime-genai/phi-4-mini", llmConfig.model.llmModelName)
+        assertEquals("<|user|>%s<|end|><|assistant|>", llmConfig.chat.userTemplate)
         assertEquals("<|end|>", llmConfig.stopWords.last())
         assertEquals(256, llmConfig.runtime.batchSize)
     }
@@ -175,7 +175,7 @@ class UtilsTest {
 
         val gson = Gson()
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
-        assertEquals("$modelPath/mediapipe/gemma-2b/gemma-2b-it-cpu-int4.tflite", llmConfig.model.llmModelName)
+        assertEquals("$modelPath/onnxruntime-genai/phi-4-mini", llmConfig.model.llmModelName)
         assertEquals("<|end|>", llmConfig.stopWords.last())
         assertFalse(cfg.toString().contains("extraParam"))
         assertFalse(cfg.toString().contains("anotherParam"))
