@@ -53,4 +53,12 @@ object Constants {
     const val AUD_REC_SAVE_FAILED = "Failed to save audio recording."
     const val SME_ENABLED_THREADS_CONFIG_WARNING = "SME features available on device. " +
             "Recommended threads may differ."
+
+    const val BENCHMARK_MODEL_INFO = "Choose the local model or config to benchmark."
+    const val BENCHMARK_INPUT_TOKENS_INFO = "Number of input tokens for benchmark."
+    const val BENCHMARK_OUTPUT_TOKENS_INFO = "Number of output tokens to generate."
+    const val BENCHMARK_CONTEXT_SIZE_INFO = "Context length in tokens for benchmark."
+    const val BENCHMARK_THREADS_INFO = "Number of CPU threads used for benchmark."
+    const val BENCHMARK_ITERATIONS_INFO = "Number of iterations for benchmark."
+    const val BENCHMARK_WARMUP_INFO = "Number of warm-up iterations before benchmark."
 }
