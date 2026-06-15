@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import java.io.ByteArrayOutputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -19,6 +21,26 @@ project.ext.set("PUSH_MODELS_PY", "$projectDir/pushAppResources.py")
 
 
 apply("download.gradle")
+
+fun gitRevision(dir: File): String {
+    return try {
+        val stdout = ByteArrayOutputStream()
+        exec {
+            workingDir = dir
+            commandLine("git", "rev-parse", "--short", "HEAD")
+            standardOutput = stdout
+            isIgnoreExitValue = true
+        }
+        stdout.toString().trim().ifEmpty { "unknown" }
+    } catch (_: Exception) {
+        "unknown"
+    }
+}
+
+val repoRevision = gitRevision(rootProject.rootDir)
+val llmRevision = gitRevision(rootProject.rootDir.resolve("llm/llm-src"))
+val sttRevision = gitRevision(rootProject.rootDir.resolve("stt/stt-src"))
+val kleidiAiEnabled = (project.findProperty("kleidiAI") != "false")
 
 android {
     namespace = "com.arm.voiceassistant"
@@ -36,6 +58,10 @@ android {
             "LLM_FRAMEWORK",
             "\"${rootProject.extra["LLM_FRAMEWORK"] as String}\""
         )
+        buildConfigField("String", "REPO_REVISION", "\"$repoRevision\"")
+        buildConfigField("String", "LLM_REVISION", "\"$llmRevision\"")
+        buildConfigField("String", "STT_REVISION", "\"$sttRevision\"")
+        buildConfigField("boolean", "KLEIDIAI_ENABLED", kleidiAiEnabled.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true

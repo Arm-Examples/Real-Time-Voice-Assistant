@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.arm.voiceassistant.ui.screens.ModeSelectionScreen
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
+import com.arm.voiceassistant.utils.Constants
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,8 +27,7 @@ class ModeSelectionScreenUITest {
     val composeTestRule = createComposeRule()
 
     /**
-     * Sets the ModeSelectionScreen content and advances animations
-     * so all UI elements are fully visible and interactive.
+     * Sets the ModeSelectionScreen content.
      */
     private fun setModeSelectionContent(
         onChatSelected: () -> Unit = {},
@@ -41,12 +41,6 @@ class ModeSelectionScreenUITest {
                 )
             }
         }
-
-        // Your screen fades/slides in with staggered delays.
-        // Advance time so the nodes are fully visible and clickable.
-        composeTestRule.mainClock.autoAdvance = false
-        composeTestRule.mainClock.advanceTimeBy(2500L)
-        composeTestRule.mainClock.autoAdvance = true
     }
 
     /**
@@ -59,6 +53,13 @@ class ModeSelectionScreenUITest {
         composeTestRule.onNodeWithText("Choose mode").assertExists()
         composeTestRule.onNodeWithText("Chat").assertExists()
         composeTestRule.onNodeWithText("Benchmark").assertExists()
+        composeTestRule.onNodeWithText(Constants.APP_TITLE).assertExists()
+        composeTestRule.onNodeWithText(Constants.BUILD_INFO_TITLE).assertExists()
+        composeTestRule.onNodeWithText(Constants.BUILD_INFO_APP_REVISION_LABEL).assertExists()
+        composeTestRule.onNodeWithText(Constants.BUILD_INFO_KLEIDI_LABEL).assertExists()
+        composeTestRule.onNodeWithText(Constants.BUILD_INFO_LLM_FRAMEWORK_LABEL).assertExists()
+        composeTestRule.onNodeWithText(Constants.BUILD_INFO_LLM_REVISION_LABEL).assertExists()
+        composeTestRule.onNodeWithText(Constants.BUILD_INFO_STT_REVISION_LABEL).assertExists()
     }
 
     /**
@@ -85,4 +86,3 @@ class ModeSelectionScreenUITest {
         composeTestRule.runOnIdle { assertTrue(clicked) }
     }
 }
-

@@ -144,6 +144,13 @@ fun screenScaffold(
                 ) {
                     TopBar(
                         modifier = Modifier,
+                        title = when (appMode) {
+                            AppMode.Chat -> "Chat Mode"
+                            AppMode.Benchmark -> "Benchmark Mode"
+                            else -> "Arm On-Device Assistant"
+                        },
+                        showTtsToggle = appMode == AppMode.Chat,
+                        showReset = appMode == AppMode.Chat,
                         onBack = { appMode = AppMode.ModeSelection },
                         resetUserText = mainViewModel::resetUserText,
                         resetPerformanceMetrics = mainViewModel::resetPerformanceMetrics,
