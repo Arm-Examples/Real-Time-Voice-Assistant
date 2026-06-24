@@ -12,8 +12,11 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -79,7 +82,7 @@ class BenchmarkScreenUITest {
      */
     private fun setBenchmarkContent(
         modelOptionsOverride: List<String>,
-        historyEntriesOverride: List<BenchmarkHistoryEntry>? = null
+        historyEntriesOverride: List<BenchmarkHistoryEntry>? = emptyList()
     ) {
         composeTestRule.setContent {
             VoiceAssistantTheme {
@@ -133,11 +136,30 @@ class BenchmarkScreenUITest {
     }
 
     /**
+     * Verifies that info buttons are rendered for benchmark dropdowns.
+     */
+    @Test
+    fun testInfoButtonsVisible() {
+        setBenchmarkContent(modelOptionsOverride = listOf("test-model"))
+
+        composeTestRule.onNodeWithTag("benchmark_model_info").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_input_info").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_output_info").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_context_info").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_threads_info").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_iterations_info").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_warmup_info").assertExists()
+    }
+
+    /**
      * Verifies that the Results section is not shown before running a benchmark.
      */
     @Test
     fun testResultsNotVisibleInitially() {
-        setBenchmarkContent(modelOptionsOverride = listOf("test-model"))
+        setBenchmarkContent(
+            modelOptionsOverride = listOf("test-model"),
+            historyEntriesOverride = emptyList()
+        )
 
         composeTestRule.onNodeWithText("Results").assertDoesNotExist()
     }
@@ -187,8 +209,14 @@ class BenchmarkScreenUITest {
         )
 
         composeTestRule.onNodeWithText("Results").assertExists()
+        composeTestRule.onNodeWithTag("benchmark_open_saved_run").performScrollTo()
         composeTestRule.onNodeWithTag("benchmark_open_saved_run").performClick()
-        composeTestRule.onNodeWithTag("benchmark_saved_result_sheet").assertExists()
+        composeTestRule.waitUntil(timeoutMillis = 3_000) {
+            composeTestRule.onAllNodesWithTag(
+                "benchmark_saved_result_sheet",
+                useUnmergedTree = true
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /**
@@ -208,12 +236,21 @@ class BenchmarkScreenUITest {
             historyEntriesOverride = listOf(historyEntry)
         )
 
+        composeTestRule.onNodeWithTag("benchmark_history_item_1").performScrollTo()
         composeTestRule.onNodeWithTag("benchmark_history_item_1").performTouchInput {
             swipeLeft()
         }
+        composeTestRule.waitUntil(timeoutMillis = 2_000) {
+            composeTestRule.onAllNodesWithTag("benchmark_delete_saved_run_1")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("benchmark_delete_saved_run_1").performClick()
-        composeTestRule.onNodeWithText("Model: delete-me • In:128 Out:128 Ctx:2048 • Threads:4 • Iter:5 • Warm:1")
-            .assertDoesNotExist()
+        composeTestRule.waitUntil(timeoutMillis = 2_000) {
+            composeTestRule.onAllNodesWithText(
+                "Model: delete-me • In:128 Out:128 Ctx:2048 • Threads:4 • Iter:5 • Warm:1"
+            ).fetchSemanticsNodes().isEmpty()
+        }
     }
 
     /**

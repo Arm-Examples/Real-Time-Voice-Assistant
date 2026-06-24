@@ -55,6 +55,7 @@ import com.arm.voiceassistant.ui.composables.BaseDropdown
 import com.arm.voiceassistant.ui.composables.BenchmarkHistorySection
 import com.arm.voiceassistant.ui.composables.BenchmarkSavedResultSheet
 import com.arm.voiceassistant.ui.composables.ModelMetrics
+import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
 import com.arm.voiceassistant.utils.ToastService
@@ -286,7 +287,9 @@ fun BenchmarkScreen(
                         enabled = !isRunning,
                         modifier = Modifier.fillMaxWidth(),
                         valueText = { it },
-                        itemText = { it }
+                        itemText = { it },
+                        infoText = Constants.BENCHMARK_MODEL_INFO,
+                        infoTag = "benchmark_model_info"
                     )
                 }
             }
@@ -308,7 +311,7 @@ fun BenchmarkScreen(
                     ) {
                         Box(Modifier.weight(1f)) {
                             BaseDropdown(
-                                label = "Input tokens",
+                                label = "Input",
                                 options = inputSizes,
                                 selected = selectedInputSize,
                                 onSelected = {
@@ -320,13 +323,15 @@ fun BenchmarkScreen(
                                 },
                                 enabled = !isRunning,
                                 fieldTag = "benchmark_input_dropdown",
-                                optionTag = { "benchmark_input_option_$it" }
+                                optionTag = { "benchmark_input_option_$it" },
+                                infoText = Constants.BENCHMARK_INPUT_TOKENS_INFO,
+                                infoTag = "benchmark_input_info"
                             )
                         }
 
                         Box(Modifier.weight(1f)) {
                             BaseDropdown(
-                                label = "Output tokens",
+                                label = "Output",
                                 options = outputSizes,
                                 selected = selectedOutputSize,
                                 onSelected = {
@@ -338,7 +343,9 @@ fun BenchmarkScreen(
                                 },
                                 enabled = !isRunning,
                                 fieldTag = "benchmark_output_dropdown",
-                                optionTag = { "benchmark_output_option_$it" }
+                                optionTag = { "benchmark_output_option_$it" },
+                                infoText = Constants.BENCHMARK_OUTPUT_TOKENS_INFO,
+                                infoTag = "benchmark_output_info"
                             )
                         }
                     }
@@ -349,14 +356,16 @@ fun BenchmarkScreen(
                     ) {
                         Box(Modifier.weight(1f)) {
                             BaseDropdown(
-                                label = "Context size",
+                                label = "Context",
                                 options = contextSizes,
                                 selected = selectedContextSize,
                                 onSelected = { selectedContextSize = it },
                                 enabled = !isRunning,
                                 fieldTag = "benchmark_context_dropdown",
                                 optionEnabled = isContextSizeOptionEnabled,
-                                optionTag = { "benchmark_context_option_$it" }
+                                optionTag = { "benchmark_context_option_$it" },
+                                infoText = Constants.BENCHMARK_CONTEXT_SIZE_INFO,
+                                infoTag = "benchmark_context_info"
                             )
                         }
                         Box(Modifier.weight(1f)) {
@@ -365,7 +374,9 @@ fun BenchmarkScreen(
                                 options = threadOptions,
                                 selected = selectedThreads,
                                 onSelected = { selectedThreads = it },
-                                enabled = !isRunning
+                                enabled = !isRunning,
+                                infoText = Constants.BENCHMARK_THREADS_INFO,
+                                infoTag = "benchmark_threads_info"
                             )
                         }
                     }
@@ -380,7 +391,9 @@ fun BenchmarkScreen(
                                 options = iterationOptions,
                                 selected = selectedIterations,
                                 onSelected = { selectedIterations = it },
-                                enabled = !isRunning
+                                enabled = !isRunning,
+                                infoText = Constants.BENCHMARK_ITERATIONS_INFO,
+                                infoTag = "benchmark_iterations_info"
                             )
                         }
                         Box(Modifier.weight(1f)) {
@@ -389,7 +402,9 @@ fun BenchmarkScreen(
                                 options = warmupIteration,
                                 selected = selectedWarmup,
                                 onSelected = { selectedWarmup = it },
-                                enabled = !isRunning
+                                enabled = !isRunning,
+                                infoText = Constants.BENCHMARK_WARMUP_INFO,
+                                infoTag = "benchmark_warmup_info"
                             )
                         }
                     }
