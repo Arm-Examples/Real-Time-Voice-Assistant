@@ -11,6 +11,7 @@ This project is an Android voice assistant application that combines Speech-to-T
 ## Table of Contents
 
 - [High-Level Modules](#high-level-modules)
+- [Software Architecture](#software-architecture)
 - [Runtime Pipeline](#runtime-pipeline)
     - [Speech Synthesis](#speech-synthesis)
 - [User Interface Layer](#user-interface-layer)
@@ -23,34 +24,90 @@ This project is an Android voice assistant application that combines Speech-to-T
 ## High-Level Modules
 
 - `app/`: Android application (Jetpack Compose UI, view models, pipeline orchestration)
-- `stt/`: Speech-to-Text module based on whisper.cpp
-- `llm/`: LLM module based on llama.cpp (and other selectable backends)
+- `stt/`: Speech-to-Text module (STT-Runner) based on whisper.cpp
+- `llm/`: LLM module (LLM-Runner) based on llama.cpp (and other selectable backends)
 - `resources/`: Shared assets and model configuration files
+
+---
+## Software Architecture
+
+The diagram below shows the end-to-end application pipeline and how STT-Runner and LLM-Runner invoke KleidiAI to accelerate execution on Arm CPUs, including SME CPU architecture features, via Java/Kotlin → JNI → native layers.
+
+```mermaid
+flowchart TB
+    %% Top-level app
+    APP["Real-time Voice Assistant"]
+
+    %% Primary runners (left -> right)
+    STT["STT-Runner"]
+    LLM["LLM-Runner"]
+    TTS["Android TTS"]
+
+    APP --> STT
+    APP --> LLM
+    APP --> TTS
+
+
+    %% STT backend (single)
+    subgraph STT_BACKENDS["STT backends"]
+        STT_WHISPER["whisper.cpp"]
+    end
+
+    %% LLM backends (active set)
+    subgraph LLM_BACKENDS["LLM backends"]
+        LLM_LLAMA["llama.cpp"]
+        LLM_ORT["ONNX Runtime GenAI"]
+        LLM_EXECUTORCH["ExecuTorch"]
+        LLM_MNN["Alibaba MNN"]
+    end
+
+    STT --> STT_WHISPER
+
+    LLM --> LLM_LLAMA
+    LLM --> LLM_ORT
+    LLM --> LLM_EXECUTORCH
+    LLM --> LLM_MNN
+```
 
 ---
 ## Runtime Pipeline
 
-At runtime, the app coordinates the following steps:
+At runtime, the app coordinates the following steps within RTVA (the combined UI + Pipeline layer):
 
 1. **Audio capture**: `SpeechRecorder` records microphone input to a local audio file.
-2. **Transcription**: `Whisper` (STT) converts audio to text using the configured STT model.
-3. **LLM inference**: `Llm` generates a response using the selected LLM backend and model.
-4. **Speech output**: `SpeechSynthesis` drives Android Text-to-Speech to speak the response.
-5. **UI updates**: The UI receives incremental updates as partial LLM tokens arrive.
+2. **Transcription**: RTVA triggers STT to transcribe audio to text.
+3. **LLM inference**: RTVA submits the prompt to the selected LLM backend.
+4. **Token streaming + UI updates**: RTVA reads streamed tokens from the native bridge and updates chat/UI state as tokens arrive.
+5. **Speech output**: When TTS is enabled, RTVA starts `SpeechSynthesis` and feeds words/tokens as they stream.
 
-The orchestration happens in `app/src/main/java/com/arm/voiceassistant/Pipeline.kt`, which owns the lifecycle of the STT and LLM engines and manages coroutines, state, and error flow.
+Orchestration is unified under RTVA, which covers UI state, STT/LLM/TTS lifecycle, native calls, and end-to-end streaming updates.
 
 ```mermaid
-flowchart LR
-    mic[(Microphone)] --> recorder[SpeechRecorder]
-    image[(Image Upload)] --> encoder[Vision Encoder]
+sequenceDiagram
+    participant Mic as Microphone
+    participant Recorder as SpeechRecorder
+    participant RTVA as RTVA
+    participant STT as Whisper STT
+    participant Image as Image Upload
+    participant LLM as LLM backend
+    participant TTS as SpeechSynthesis (Android TTS)
+    participant Speaker as Speaker
 
-    subgraph Pipeline["Pipeline.kt"]
-        recorder --> stt[Whisper STT] --> llm[LLM backend] --> tts[SpeechSynthesis - Android TTS]
-        encoder -->|embeddings| llm
-    end
+    Mic->>Recorder: capture audio
+    Recorder-->>RTVA: audio file ready
+    RTVA->>STT: transcribe audio
+    STT-->>RTVA: transcript text
 
-    tts --> speaker[Speaker]
+    Image->>RTVA: select image
+    RTVA->>LLM: set image path + encode (empty submit)
+
+    RTVA->>LLM: submit prompt
+    LLM-->>RTVA: response tokens (streamed via native bridge)
+    RTVA-->>RTVA: partial tokens / state updates
+
+    RTVA->>TTS: start speech synthesis
+    RTVA->>TTS: add words as tokens arrive
+    TTS-->>Speaker: play audio
 ```
 
 ---
