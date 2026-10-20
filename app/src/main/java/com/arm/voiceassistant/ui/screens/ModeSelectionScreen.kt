@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Speed
@@ -37,19 +37,23 @@ import com.arm.voiceassistant.ui.composables.BuildInfoSection
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.Constants
 
+private const val chatButtonText = "Chat"
+private const val benchmarkButtonText = "Benchmark"
+
 /**
  * Screen allowing the user to select the application mode.
  *
- * Presents animated buttons for entering chat or benchmark modes
- * with a themed background and staggered entrance animations.
+ * Presents buttons for entering chat or benchmark modes with a themed background.
  *
  * @param modifier Optional modifier for layout customization
+ * @param modelsAvailable Whether Chat and Benchmark should be selectable
  * @param onChatSelected Callback invoked when Chat mode is selected
  * @param onBenchmarkSelected Callback invoked when Benchmark mode is selected
  */
 @Composable
 fun ModeSelectionScreen(
     modifier: Modifier = Modifier,
+    modelsAvailable: Boolean = true,
     onChatSelected: () -> Unit,
     onBenchmarkSelected: () -> Unit
 ) {
@@ -101,6 +105,7 @@ fun ModeSelectionScreen(
 
             FilledTonalButton(
                 onClick = onChatSelected,
+                enabled = modelsAvailable,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                     contentColor = MaterialTheme.colorScheme.onSurface
@@ -108,14 +113,15 @@ fun ModeSelectionScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.Chat,
-                    contentDescription = "Chat"
+                    contentDescription = chatButtonText
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Text("Chat")
+                Text(chatButtonText)
             }
 
             FilledTonalButton(
                 onClick = onBenchmarkSelected,
+                enabled = modelsAvailable,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                     contentColor = MaterialTheme.colorScheme.onSurface
@@ -123,12 +129,11 @@ fun ModeSelectionScreen(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Speed,
-                    contentDescription = "Benchmark"
+                    contentDescription = benchmarkButtonText
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Text("Benchmark")
+                Text(benchmarkButtonText)
             }
-
         }
 
         Surface(
@@ -148,7 +153,7 @@ fun ModeSelectionScreen(
 }
 
 /**
- * Mode selection screen preview
+ * Mode selection screen preview.
  */
 @Preview(showBackground = true)
 @Composable

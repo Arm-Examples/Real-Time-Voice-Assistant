@@ -6,25 +6,28 @@
  */
 
 package com.arm.voiceassistant
+import android.os.Environment
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.arm.Llm
 import com.arm.stt.Whisper
 import com.arm.stt.WhisperConfig
 import com.arm.voiceassistant.audio.AudioReader
+import com.arm.voiceassistant.huggingface.HuggingFaceApiService
+import com.arm.voiceassistant.huggingface.HuggingFaceModel
+import com.arm.voiceassistant.huggingface.ModelDownloadSpec
+import com.arm.voiceassistant.huggingface.ProgressListener
 import com.arm.voiceassistant.speech.SpeechRecorder
 import com.arm.voiceassistant.speech.SpeechSynthesis
 import kotlinx.coroutines.cancel
 import com.arm.voiceassistant.ui.composables.pipeline
+import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.Constants.LLM_INITIALIZATION_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_CONTEXT_CAPACITY_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_QUERY_EVALUATION_ERROR
 import com.arm.voiceassistant.utils.Constants.LLM_IMAGE_ADD_ERROR
-import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
-import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
-import com.arm.voiceassistant.utils.ToastService
 import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.createLlmDefaultConfig
 import com.arm.voiceassistant.utils.Utils.createSttDefaultConfig
@@ -32,6 +35,7 @@ import com.arm.voiceassistant.utils.Utils.isValidLlmConfig
 import com.arm.voiceassistant.utils.Utils.isValidSttConfig
 import com.arm.voiceassistant.utils.Utils.readLlmUserConfig
 import com.arm.voiceassistant.utils.Utils.readSttUserConfig
+import com.arm.voiceassistant.utils.userFacingModelAvailabilityErrorMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,6 +47,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
 import java.io.File
 import java.io.FileInputStream
 
@@ -61,7 +67,7 @@ import java.io.FileInputStream
  */
 
 class Pipeline(
-    modelPath: String,
+    private val modelPath: String,
     errorFlow: MutableSharedFlow<String>,
     isTest: Boolean = false,
     private val sharedLibraryPath: String = "",
@@ -70,7 +76,7 @@ class Pipeline(
     private var timers = PipelineTimers()                    // Various timers needed
     private val audioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    @get:androidx.annotation.VisibleForTesting
+    @VisibleForTesting
     var speechRecorder: SpeechRecorder = SpeechRecorder(audioScope)
         internal set
     private var speechFilePath: String = ""                  // Path to the recorded audio file
@@ -87,28 +93,45 @@ class Pipeline(
     private var lastImageEncodeJob: Job? = null
     private var isTestMode = isTest
 
+    private val manifestDownloader = HuggingFaceApiService()
+
     // User config file for llm, resolved per framework (files now generated in module dirs)
     private var configFileName: String = Utils.getLlmConfig(llmFramework)
     private var pipelineErrorFlow = errorFlow
     // User config file name stt
     private var configFileNameSTT = "whisperTextConfig.json"
+    private val configAssetsDir = "configs"
 
-    /**
-     * Initialize speech recognition, large language model and speech synthesis
-     */
-    init {
+    private fun getAssetConfigText(fileName: String): String? {
+        Log.i(VOICE_ASSISTANT_TAG, "configAssetsDir... $configAssetsDir")
+        val appContext = AppContext.getInstance().context ?: return null
+        val assetPath = "$configAssetsDir/$fileName"
+        Log.i(VOICE_ASSISTANT_TAG, "asset path... $assetPath")
+        return try {
+            appContext.assets.open(assetPath).bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
+            Log.e(VOICE_ASSISTANT_TAG, "Config asset not found: $assetPath")
+            return ""
+        }
+    }
+
+    /** Initialize speech recognition, large language model and speech synthesis. */
+    suspend fun initialize(): ModelAvailabilityStatus {
         Log.i(VOICE_ASSISTANT_TAG,"Android Shared Library Path $sharedLibraryPath")
 
-        if (!isTest) {
-            if(hasSME()) {
-                ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
+        if (isTestMode) return ModelAvailabilityStatus(available = true)
+
+        val availability = checkManifestModelsAvailability()
+        if (availability.available) {
+            withContext(Dispatchers.IO) {
+                statusReporter?.invoke("Loading speech-to-text model...")
+                initializeSTT(modelPath)
+                statusReporter?.invoke("Loading language model...")
+                initializeLLM(modelPath)
+                statusReporter?.invoke("Finalizing setup...")
             }
-            statusReporter?.invoke("Loading speech-to-text model...")
-            initializeSTT(modelPath)
-            statusReporter?.invoke("Loading language model...")
-            initializeLLM(modelPath)
-            statusReporter?.invoke("Finalizing setup...")
         }
+        return availability
     }
 
     /**
@@ -160,6 +183,185 @@ class Pipeline(
         destroy()
     }
 
+    internal suspend fun checkManifestModelsAvailability(): ModelAvailabilityStatus = withContext(Dispatchers.IO) {
+        val appContext = AppContext.getInstance().context ?: run {
+            Log.w(VOICE_ASSISTANT_TAG, "Manifest check skipped: context unavailable")
+            return@withContext ModelAvailabilityStatus(
+                available = false,
+                errorMessage = "Application context has not been set"
+            )
+        }
+        val unresolvedSpecs = readManifestModels().getOrElse { e ->
+            val message = e.message ?: "Failed to read manifest.json for $llmFramework"
+            Log.e(VOICE_ASSISTANT_TAG, message, e)
+            return@withContext ModelAvailabilityStatus(
+                available = false,
+                errorMessage = message
+            )
+        }
+        val client = OkHttpClient()
+        val specs = resolveManifestSpecSha256s(client, unresolvedSpecs).getOrElse { e ->
+            Log.e(VOICE_ASSISTANT_TAG, "Failed to resolve model SHA-256 metadata for $llmFramework", e)
+            return@withContext ModelAvailabilityStatus(
+                available = false,
+                errorMessage = userFacingModelAvailabilityErrorMessage(e)
+            )
+        }
+        if (specs.isEmpty()) {
+            val message = "No models defined in manifest.json for $llmFramework"
+            Log.i(VOICE_ASSISTANT_TAG, message)
+            return@withContext ModelAvailabilityStatus(
+                available = false,
+                errorMessage = message
+            )
+        }
+
+        val downloadRoot =
+            appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
+        if (downloadRoot.isNullOrBlank()) {
+            val message = "Model download path unavailable"
+            Log.w(VOICE_ASSISTANT_TAG, message)
+            return@withContext ModelAvailabilityStatus(
+                available = false,
+                errorMessage = message
+            )
+        }
+
+        val invalidSpecs = specs.filter { spec ->
+            val targetFile = resolveManifestTargetFile(downloadRoot, spec)
+            !manifestDownloader.verifyIfNeeded(targetFile, spec.sha256)
+        }
+        if (invalidSpecs.isNotEmpty()) {
+            val missingFileNames = invalidSpecs.map { it.fileName }.distinct()
+            Log.w(
+                VOICE_ASSISTANT_TAG,
+                "Models missing or invalid: ${missingFileNames.joinToString()}"
+            )
+            return@withContext ModelAvailabilityStatus(
+                available = false,
+                missingFileNames = missingFileNames
+            )
+        }
+        ModelAvailabilityStatus(available = true)
+    }
+
+    internal suspend fun downloadManifestModels(
+        onProgress: ((ModelDownloadSpec, Int, Int, Long, Long?) -> Unit)? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val appContext = AppContext.getInstance().context
+            ?: return@withContext manifestDownloadFailure(
+                "Manifest download failed: context unavailable"
+            )
+        val unresolvedSpecs = readManifestModels().getOrElse { e ->
+            return@withContext manifestDownloadFailure(
+                e.message ?: "Failed to read manifest.json for $llmFramework"
+            )
+        }
+        val client = OkHttpClient()
+        val specs = resolveManifestSpecSha256s(client, unresolvedSpecs).getOrElse { e ->
+            return@withContext manifestDownloadFailure(
+                e.message ?: "Failed to resolve model SHA-256 metadata for $llmFramework"
+            )
+        }
+        if (specs.isEmpty()) {
+            return@withContext manifestDownloadFailure(
+                "No models defined in manifest.json for $llmFramework"
+            )
+        }
+
+        val downloadRoot =
+            appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
+        if (downloadRoot.isNullOrBlank()) {
+            return@withContext manifestDownloadFailure("Model download path unavailable")
+        }
+
+        val pendingSpecs = specs.filter { spec ->
+            val targetFile = resolveManifestTargetFile(downloadRoot, spec)
+            !manifestDownloader.verifyIfNeeded(targetFile, spec.sha256)
+        }
+
+        pendingSpecs.forEachIndexed { index, spec ->
+            val targetFile = resolveManifestTargetFile(downloadRoot, spec)
+            val modelDownloadMessage =
+                "Downloading model ${spec.fileName} -> ${targetFile.absolutePath}"
+            Log.i(VOICE_ASSISTANT_TAG, modelDownloadMessage)
+            val fileIndex = index + 1
+            val fileCount = pendingSpecs.size
+            onProgress?.invoke(spec, fileIndex, fileCount, 0L, null)
+            val result = manifestDownloader.downloadModelFile(
+                context = appContext,
+                client = client,
+                modelInfo = HuggingFaceModel(
+                    id = "manifest",
+                    modelId = "manifest",
+                    filename = spec.fileName,
+                    revision = spec.huggingFaceSource?.revision
+                ),
+                downloadPath = downloadRoot,
+                spec = spec,
+                listener = onProgress?.let {
+                    object : ProgressListener {
+                        override fun onProgress(downloadedBytes: Long, totalBytes: Long?) {
+                            it(spec, fileIndex, fileCount, downloadedBytes, totalBytes)
+                        }
+                    }
+                }
+            )
+            if (result.isFailure) {
+                val exception = result.exceptionOrNull()
+                    ?: IllegalStateException("Failed to download ${spec.fileName}")
+                Log.e(VOICE_ASSISTANT_TAG, "Failed to download ${spec.fileName}", exception)
+                return@withContext Result.failure(exception)
+            }
+            Log.i(VOICE_ASSISTANT_TAG, "Downloaded model ${spec.fileName}")
+        }
+        Result.success(Unit)
+    }
+
+    private fun manifestDownloadFailure(message: String): Result<Unit> {
+        val exception = IllegalStateException(message)
+        Log.e(VOICE_ASSISTANT_TAG, message, exception)
+        return Result.failure(exception)
+    }
+
+    private fun resolveManifestTargetFile(
+        downloadRoot: String,
+        spec: ModelDownloadSpec
+    ): File {
+        val destination = spec.destination.trim().trimStart('/', '\\')
+        return if (destination.isBlank()) {
+            File(downloadRoot, spec.fileName)
+        } else if (destination.endsWith("/") || destination.endsWith(File.separator)) {
+            File(File(downloadRoot, destination), spec.fileName)
+        } else {
+            File(downloadRoot, destination)
+        }
+    }
+
+    private fun readManifestModels(): Result<List<ModelDownloadSpec>> {
+        val appContext = AppContext.getInstance().context
+            ?: return Result.failure(IllegalStateException("Application context unavailable"))
+        return runCatching {
+            val manifestJson = appContext.assets.open("manifest.json")
+                .bufferedReader()
+                .use { it.readText() }
+            val manifest = Json { ignoreUnknownKeys = true }
+                .decodeFromString<Manifest>(manifestJson)
+            resolveManifestDownloadSpecs(manifest, llmFramework).getOrThrow()
+        }.onFailure { e ->
+            Log.e(VOICE_ASSISTANT_TAG, "Failed to read manifest.json", e)
+        }
+    }
+
+    private suspend fun resolveManifestSpecSha256s(
+        client: OkHttpClient,
+        specs: List<ModelDownloadSpec>
+    ): Result<List<ModelDownloadSpec>> = runCatching {
+        specs.map { spec ->
+            manifestDownloader.resolveSha256IfNeeded(client, spec).getOrThrow()
+        }
+    }
+
     /**
      * Method to emit error status of jobs launched form pipeline
      * @param status error message to be displayed on toast
@@ -175,22 +377,18 @@ class Pipeline(
     internal fun initializeSTT(modelPath: String) {
 
         runCatching {
-
-                sttContext = stt.initContext(
-                    "$modelPath/${Constants.STT_MODEL_NAME}",
-                    sharedLibraryPath
-                )
-                val configFileWhisper = File("$modelPath/$configFileNameSTT")
-                var whisperParams = WhisperConfig()
-                if (configFileWhisper.exists()) {
-                    if (isValidSttConfig(configFileWhisper)) {
-                        whisperParams = readSttUserConfig(configFileWhisper)
-                    }
+            sttContext = stt.initContext(
+                "$modelPath/${Constants.STT_MODEL_NAME}",
+                sharedLibraryPath
+            )
+            val configTextWhisper = getAssetConfigText(configFileNameSTT)
+            var whisperParams: WhisperConfig = if (configTextWhisper != null && isValidSttConfig(configTextWhisper)) {
+                readSttUserConfig(configTextWhisper)
             } else {
-                    whisperParams = createSttDefaultConfig()
-                }
-                // Initialize stt parameters
-                stt.initParameters(whisperParams)
+                createSttDefaultConfig()
+            }
+            // Initialize stt parameters
+            stt.initParameters(whisperParams)
         }.onFailure { e ->
             val msg = "Failed to initialize STT"
             Log.e(VOICE_ASSISTANT_TAG, msg, e)
@@ -206,10 +404,10 @@ class Pipeline(
      */
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal  fun initializeLLM(modelPath: String) {
-        val configFile = File("$modelPath/$configFileName")
+        val configText = getAssetConfigText(configFileName)
         val configurationString =
-            if (configFile.exists() && isValidLlmConfig(configFile)) {
-                readLlmUserConfig(configFile, modelPath).toString()
+            if (configText != null && isValidLlmConfig(configText)) {
+                readLlmUserConfig(configText, modelPath).toString()
             } else {
                 Log.w(VOICE_ASSISTANT_TAG, "Using default config file to initialize LLM")
                 createLlmDefaultConfig(modelPath, llmFramework).toString()
@@ -226,15 +424,11 @@ class Pipeline(
             pipeline = this
         }
         initResult.onFailure { e ->
-             if (configFile.exists()) {
-                 if (isValidLlmConfig(configFile)) {
-                     Log.e(VOICE_ASSISTANT_TAG, "Failed to initialize LLM using user provided config file", e)
-                 }
-             else
-                 {
-                     Log.w(VOICE_ASSISTANT_TAG, "User provided invalid config file for LLM")
-                 }
-            }
+             if (configText != null && isValidLlmConfig(configText)) {
+                 Log.e(VOICE_ASSISTANT_TAG, "Failed to initialize LLM using user provided config file", e)
+             } else {
+                 Log.w(VOICE_ASSISTANT_TAG, "User provided invalid config file for LLM")
+             }
             val msg = LLM_INITIALIZATION_ERROR
             Log.e(VOICE_ASSISTANT_TAG, msg, e)
             runBlocking {

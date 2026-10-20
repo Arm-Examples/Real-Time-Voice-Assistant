@@ -18,7 +18,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
  *  - update decode TPS at completion (and reflect it on the last assistant message)
  */
 class ChatMetricsUpdater(
-    private val uiState: MutableStateFlow<com.arm.voiceassistant.viewmodels.MainUiState>,
+    private val uiState: MutableStateFlow<MainUiState>,
     private val messages: SnapshotStateList<ChatMessage>,
 ) {
     /**

@@ -1,0 +1,61 @@
+/*
+ * SPDX-FileCopyrightText: Copyright 2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * Custom gradle tasks for application and tests - update apk to include assets
+ */
+
+def localConfigFolderLlm = file(project.ext.CONFIG_DIR_LLM).absolutePath
+def localConfigFolderStt = file(project.ext.CONFIG_DIR_STT).absolutePath
+
+// Copy config files (LLM and STT) into app assets before mergeAssets
+tasks.register("syncConfigsForAssets", Copy) {
+    group = "model-sync"
+    description = "Copies configuration files into app assets before merge"
+
+    def assetsDir = file("src/main/assets/configs")
+    def llmConfigDir = new File(localConfigFolderLlm)
+    def sttConfigDir = new File(localConfigFolderStt)
+
+    onlyIf { llmConfigDir.exists() || sttConfigDir.exists() }
+
+    from(llmConfigDir)
+    from(sttConfigDir)
+    into(assetsDir)
+}
+
+// Copy config files (LLM and STT) into app assets after assemble for local sync
+tasks.register("copyConfigsToAssets", Copy) {
+    group = "model-sync"
+    description = "Copies configuration files into app assets after models"
+
+    def assetsDir = file("src/main/assets/configs")
+    def llmConfigDir = new File(localConfigFolderLlm)
+    def sttConfigDir = new File(localConfigFolderStt)
+
+    onlyIf { llmConfigDir.exists() || sttConfigDir.exists() }
+
+    from(llmConfigDir)
+    from(sttConfigDir)
+    into(assetsDir)
+}
+
+// Run LLM model push after assemble task
+tasks.matching { it.name.startsWith("assemble") }.configureEach {
+    finalizedBy("copyConfigsToAssets")
+}
+
+// Ensure config assets are present before mergeAssets
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn("syncConfigsForAssets")
+}
+
+// Ensure lint tasks see generated assets
+tasks.matching {
+    it.name.startsWith("lint") || it.name.contains("Lint")
+}.configureEach {
+    dependsOn("syncConfigsForAssets")
+}

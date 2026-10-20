@@ -96,7 +96,8 @@ class UtilsTest {
      */
     @Test
     fun testCreateDefaultConfigForLlamaFramework() {
-        val defaultConfig = createLlmDefaultConfig(modelPath, "llama.cpp")
+        val llmFramework = "llama.cpp"
+        val defaultConfig = createLlmDefaultConfig(modelPath, llmFramework)
 
         assertEquals(true, defaultConfig.model.isVision)
         assertEquals("<|im_end|>", defaultConfig.stopWords.last())
@@ -104,7 +105,7 @@ class UtilsTest {
         assertEquals( "<|im_start|>system\n%s<|im_end|>\n", defaultConfig.chat.systemTemplate)
         assertEquals("<|im_end|>", defaultConfig.stopWords.last())
         assertEquals(256, defaultConfig.runtime.batchSize)
-        assertEquals("$modelPath/llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf", defaultConfig.model.llmModelName)
+        assertEquals("$modelPath/$llmFramework/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf", defaultConfig.model.llmModelName)
         assertEquals(expectedSystemPrompt, defaultConfig.chat.systemPrompt)
 
     }
@@ -114,7 +115,8 @@ class UtilsTest {
      */
     @Test
     fun testCreateDefaultConfigForOnnxrtGenaiFramework() {
-        val defaultConfig = createLlmDefaultConfig(modelPath, "onnxruntime-genai")
+        val llmFramework = "onnxruntime-genai"
+        val defaultConfig = createLlmDefaultConfig(modelPath, llmFramework)
 
         val stopWordsOnnx = stopWords.plus(listOf("<|im_end|>", "<|end|>"))
 
@@ -124,7 +126,7 @@ class UtilsTest {
         assertEquals( "<|system|>%s<|end|>", defaultConfig.chat.systemTemplate)
         assertEquals("<|end|>", defaultConfig.stopWords.last())
         assertEquals(1, defaultConfig.runtime.batchSize)
-        assertEquals("$modelPath/onnxruntime-genai/phi-4-mini", defaultConfig.model.llmModelName)
+        assertEquals("$modelPath/$llmFramework/phi-4-mini", defaultConfig.model.llmModelName)
         assertEquals(stopWordsOnnx, defaultConfig.stopWords)
         assertEquals(expectedSystemPrompt, defaultConfig.chat.systemPrompt)
     }
@@ -135,7 +137,7 @@ class UtilsTest {
 
         file.writeText(setupConfigJson().toString())
         Log.i("tag", file.toString())
-        val cfg = readLlmUserConfig(file, modelPath)
+        val cfg = readLlmUserConfig(file.readText(), modelPath)
 
         val gson = Gson()
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
@@ -154,7 +156,7 @@ class UtilsTest {
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
 
         file.writeText(jsonConfig.toString())
-        val cfg = readLlmUserConfig(file, modelPath)
+        val cfg = readLlmUserConfig(file.readText(), modelPath)
 
         val gson = Gson()
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
@@ -171,7 +173,7 @@ class UtilsTest {
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
         file.writeText(configJson.toString())
 
-        val cfg = readLlmUserConfig(file, modelPath)
+        val cfg = readLlmUserConfig(file.readText(), modelPath)
 
         val gson = Gson()
         val llmConfig = gson.fromJson(cfg.toString(), Utils.UserLlmConfig::class.java)
@@ -189,7 +191,7 @@ class UtilsTest {
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
         file.writeText(jsonMissingNumThreads.toString())
 
-        assertFalse(isValidLlmConfig(file))
+        assertFalse(isValidLlmConfig(file.readText()))
     }
 
     @Test
@@ -200,7 +202,7 @@ class UtilsTest {
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
         file.writeText(configJson.toString())
 
-        assertFalse(isValidLlmConfig(file))
+        assertFalse(isValidLlmConfig(file.readText()))
     }
 
     @Test
@@ -208,6 +210,6 @@ class UtilsTest {
         val notValidJson = "{ not: valid json }"
         val file = File.createTempFile("user-config", ".json").apply { deleteOnExit() }
         file.writeText(notValidJson)
-        assertFalse(isValidLlmConfig(file))
+        assertFalse(isValidLlmConfig(file.readText()))
     }
 }

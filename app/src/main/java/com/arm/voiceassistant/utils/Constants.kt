@@ -37,7 +37,7 @@ object Constants {
     const val BUILD_INFO_STT_REVISION_LABEL = "STT revision"
 
     // Recording related, in ms
-    const val MIN_ALLOWED_RECORDING : Long = 1100
+    const val MIN_ALLOWED_RECORDING: Long = 1100
 
     const val LLM_INITIALIZATION_ERROR = "LLM initialization failed due to config/model error."
     const val LLM_CONTEXT_CAPACITY_ERROR = "LLM Context capacity has filled, try resetting the context."
@@ -52,7 +52,7 @@ object Constants {
     const val AUD_REC_INPUT_ERROR = "Audio input error. Please retry."
     const val AUD_REC_SAVE_FAILED = "Failed to save audio recording."
     const val SME_ENABLED_THREADS_CONFIG_WARNING = "SME features available on device. " +
-            "Recommended threads may differ."
+        "Recommended threads may differ."
 
     const val BENCHMARK_MODEL_INFO = "Choose the local model or config to benchmark."
     const val BENCHMARK_INPUT_TOKENS_INFO = "Number of input tokens for benchmark."
@@ -61,4 +61,10 @@ object Constants {
     const val BENCHMARK_THREADS_INFO = "Number of CPU threads used for benchmark."
     const val BENCHMARK_ITERATIONS_INFO = "Number of iterations for benchmark."
     const val BENCHMARK_WARMUP_INFO = "Number of warm-up iterations before benchmark."
+
+    const val HUGGING_FACE_CONNECTION_TIMEOUT = 10_000
+    const val HUGGING_FACE_HOST = "https://huggingface.co/"
+    const val HUGGING_FACE_HEADERS_JSON =
+        """{"Accept":"application/json","Accept-Encoding":"identity","User-Agent":"curl/8.0.1"}"""
+
 }

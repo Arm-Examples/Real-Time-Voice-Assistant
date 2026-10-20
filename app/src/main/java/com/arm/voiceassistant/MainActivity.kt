@@ -6,8 +6,8 @@
 
 package com.arm.voiceassistant
 
-import android.Manifest.permission.RECORD_AUDIO
 import android.Manifest.permission.MODIFY_AUDIO_SETTINGS
+import android.Manifest.permission.RECORD_AUDIO
 import android.app.AlertDialog
 import android.app.Application
 import android.content.Intent
@@ -39,6 +39,7 @@ import com.arm.voiceassistant.viewmodels.MainViewModel
 class MainActivity : ComponentActivity() {
 
     private lateinit var mainViewModel: MainViewModel                       // Save the mainViewModel for the post initialized parts
+
     private val permissions = arrayOf(RECORD_AUDIO, MODIFY_AUDIO_SETTINGS)  // Permissions required
     private val requestPermissionLauncher = registerForActivityResult(      // Permission request launcher
         ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -89,12 +90,14 @@ class MainActivity : ComponentActivity() {
      * @param permissions Map of permission results from the launcher
      */
     private fun handlePermissionsNotGranted(permissions: Map<String, Boolean>) {
-        val permanentlyDeniedPermissions = permissions.filter { !it.value && !shouldShowRequestPermissionRationale(it.key) }
+        val permanentlyDeniedPermissions = permissions.filter {
+            !it.value && !shouldShowRequestPermissionRationale(it.key) }
         if (permanentlyDeniedPermissions.isNotEmpty()) {
             // Show a dialog explaining why the permissions are needed and provide a way to open app settings
             AlertDialog.Builder(this)
                 .setTitle("Permissions Required")
-                .setMessage("The Voice Assistant requires 'Microphone' permissions to function properly. Please enable them in the Settings.")
+                .setMessage("The Voice Assistant requires 'Microphone' permissions to function " +
+                        "properly. Please enable them in the Settings.")
                 .setPositiveButton("Open Settings") { _, _ ->
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", packageName, null)

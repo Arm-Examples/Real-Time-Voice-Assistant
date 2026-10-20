@@ -27,3 +27,5 @@ captures/
 *.apk
 output.json
 
+# Configuration assets added during build
+app/src/main/assets/configs/
