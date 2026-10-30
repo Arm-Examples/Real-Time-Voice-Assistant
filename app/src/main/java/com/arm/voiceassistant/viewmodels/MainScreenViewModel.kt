@@ -7,6 +7,7 @@
 package com.arm.voiceassistant.viewmodels
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
@@ -16,6 +17,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arm.Llm
 import com.arm.voiceassistant.BuildConfig
+import com.arm.voiceassistant.ModelAvailabilityStatus
 import com.arm.voiceassistant.Pipeline
 import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryEntry
 import com.arm.voiceassistant.data.benchmark.BenchmarkHistoryRepository
@@ -37,7 +39,12 @@ import com.arm.voiceassistant.utils.Constants.RESPONSE_JOB_IN_PROGRESS_ERROR
 import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
 import com.arm.voiceassistant.utils.Constants.VOICE_ASSISTANT_TAG
 import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
+import com.arm.voiceassistant.utils.DownloadUiState
+import com.arm.voiceassistant.utils.Error
 import com.arm.voiceassistant.utils.LlmBridge
+import com.arm.voiceassistant.utils.MainUiState
+import com.arm.voiceassistant.utils.ModelAvailabilityState
+import com.arm.voiceassistant.utils.ModelAvailabilityUiState
 import com.arm.voiceassistant.utils.NativeResult
 import com.arm.voiceassistant.utils.Timer
 import com.arm.voiceassistant.utils.TimingStats
@@ -45,6 +52,7 @@ import com.arm.voiceassistant.utils.Utils
 import com.arm.voiceassistant.utils.Utils.responseComplete
 import com.arm.voiceassistant.utils.Utils.resolveModelPath
 import com.arm.voiceassistant.utils.ToastService
+import com.arm.voiceassistant.utils.userFacingDownloadErrorMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,50 +72,10 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Main screen UI state
- *
- * @property contentState state used to determine UI content to display
- * @property error error information
- * @property userText transcribed input from user
- * @property responseText text response from voice assistant
- * @property recTime formatted duration of current recording
- * @property recTimeMs the duration of current recording in ms
- * @property playingAudio if speech response is playing
- * @property sttTime whisper model time taken
- * @property llmEncodeTPS LLM model encode tokens/second
- * @property llmDecodeTPS LLM model decode tokens/second
- */
-data class MainUiState(
-    val contentState: ContentStates = ContentStates.Idle,
-    val error: Error = Error(),
-    val userText: String = "",
-    val responseText: String = "",
-    val imagePath: String = "",
-    val recTime: String = "00:00",
-    val recTimeMs: Long = 0,
-    val playingAudio: Boolean = false,
-    val sttTime: String = INITIAL_METRICS_VALUE,
-    val llmEncodeTPS: String = INITIAL_METRICS_VALUE,
-    val llmDecodeTPS: String = INITIAL_METRICS_VALUE,
-    val isTTSEnabled: Boolean = false,
-    val ttsWarningMessage: String? = null
-)
-
-/**
- * Class to hold error information
- * @property state true if there is an error
- * @property message error message to display
- */
-data class Error(
-    val state: Boolean = false,
-    val contextCapacity: Boolean = false,
-    val message: String = ""
-)
-
-/**
  * The default filename used for storing the recorded audio file.
  */
 private const val FILE_NAME = "recording.wav"
+
 
 /**
  * Main ViewModel responsible for holding and managing UI related data
@@ -120,6 +88,11 @@ private const val FILE_NAME = "recording.wav"
 class MainViewModel(application: Application, isTest: Boolean = false) : ViewModel() {
     private val _uiState = MutableStateFlow(MainUiState())
     var uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    private val _downloadUiState = MutableStateFlow(DownloadUiState())
+    val downloadUiState: StateFlow<DownloadUiState> = _downloadUiState.asStateFlow()
+    private val _modelAvailabilityUiState = MutableStateFlow(ModelAvailabilityUiState())
+    val modelAvailabilityUiState: StateFlow<ModelAvailabilityUiState> =
+        _modelAvailabilityUiState.asStateFlow()
     val messages: SnapshotStateList<ChatMessage> = mutableStateListOf()
 
     private val filePath: String =
@@ -152,7 +125,9 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
 
 
     private val stringStatusFlow = MutableSharedFlow<String>()
-    val errorFlow: SharedFlow<String> = stringStatusFlow.asSharedFlow()
+    private val errorFlow: SharedFlow<String> = stringStatusFlow.asSharedFlow()
+
+    private val applicationContext: Context = application.applicationContext
 
     /**
      * Initializes the [Pipeline] and related LLM helpers.
@@ -175,13 +150,37 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
             ) { message ->
                 _statusMessage.value = message
             }
+            val availability = pipeline.initialize()
+            updateModelAvailabilityState(availability)
             llm = pipeline.llm
             llmBridge = LlmBridge(llm)
-            imageUploadEnabled = pipeline.supportsImageInput()
+            imageUploadEnabled = pipeline.llmInitialized() && pipeline.supportsImageInput()
             _statusMessage.value = null
         }.onFailure { e ->
             Log.e(VOICE_ASSISTANT_TAG, "Failed to Initialize the pipeline :$e", e)
             onError(PIPELINE_INIT_ERROR)
+        }
+    }
+
+    private fun updateModelAvailabilityState(availability: ModelAvailabilityStatus) {
+        _modelAvailabilityUiState.update {
+            it.copy(
+                state = if (availability.available) {
+                    ModelAvailabilityState.Available
+                } else {
+                    ModelAvailabilityState.Checked
+                },
+                missingModelNames = if (availability.available) {
+                    emptyList()
+                } else {
+                    availability.missingFileNames
+                },
+                errorMessage = if (availability.available) {
+                    null
+                } else {
+                    availability.errorMessage
+                }
+            )
         }
     }
 
@@ -234,9 +233,12 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     init {
         reset()
-        // Keep initial pipeline creation synchronous for predictable startup behavior.
-        runBlocking {
-            initPipeline(isTest)
+        if (isTest) {
+            runBlocking { initPipeline(true) }
+        } else {
+            viewModelScope.launch {
+                initPipeline(false)
+            }
         }
     }
 
@@ -317,12 +319,12 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
         }
 
         val summary = BenchmarkOverheadSummary(
-            javaEncodeTotalMs = llm.getLastBenchmarkJavaEncodeTotalMs(),
-            coreCppEncodeTotalMs = llm.getLastBenchmarkCoreCppEncodeTotalMs(),
-            encodeOverheadMs = llm.getLastBenchmarkEncodeOverheadMs(),
-            javaDecodeTotalMs = llm.getLastBenchmarkJavaDecodeLoopTotalMs(),
-            coreCppDecodeTotalMs = llm.getLastBenchmarkCoreCppDecodeTotalMs(),
-            decodeOverheadMs = llm.getLastBenchmarkDecodeOverheadMs()
+            javaEncodeTotalMs = llm.lastBenchmarkJavaEncodeTotalMs,
+            coreCppEncodeTotalMs = llm.lastBenchmarkCoreCppEncodeTotalMs,
+            encodeOverheadMs = llm.lastBenchmarkEncodeOverheadMs,
+            javaDecodeTotalMs = llm.lastBenchmarkJavaDecodeLoopTotalMs,
+            coreCppDecodeTotalMs = llm.lastBenchmarkCoreCppDecodeTotalMs,
+            decodeOverheadMs = llm.lastBenchmarkDecodeOverheadMs
         )
 
         return if (!summary.isValid) {
@@ -374,7 +376,7 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun onStartRecording() {
         runCatching {
-        // Reset state from previous run
+            // Reset state from previous run
             clearResponseText()
             _uiState.update { currentState ->
                 currentState.copy(
@@ -951,5 +953,155 @@ class MainViewModel(application: Application, isTest: Boolean = false) : ViewMod
      */
     fun clearTtsWarningMessage() {
         _uiState.update { it.copy(ttsWarningMessage = null) }
+    }
+
+    private fun clampDownloadBytes(bytes: Long?): Int =
+        bytes?.coerceIn(0L, Int.MAX_VALUE.toLong())?.toInt() ?: 0
+
+    private fun fileProgress(downloadedBytes: Long, totalBytes: Long?): Int? {
+        if (totalBytes == null || totalBytes <= 0L) {
+            return null
+        }
+        return ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
+    }
+
+    private fun estimatedSecondsRemaining(
+        downloadedBytes: Long,
+        totalBytes: Long?,
+        bytesPerSecond: Long
+    ): Long? {
+        if (totalBytes == null || totalBytes <= downloadedBytes || bytesPerSecond <= 0L) {
+            return null
+        }
+        return ((totalBytes - downloadedBytes) / bytesPerSecond).coerceAtLeast(0L)
+    }
+
+    fun downloadAppModels() {
+        if (_downloadUiState.value.isRunning) {
+            return
+        }
+        _modelAvailabilityUiState.update {
+            it.copy(state = ModelAvailabilityState.Downloading)
+        }
+        _downloadUiState.update {
+            it.copy(
+                done = 0,
+                total = 0,
+                doneBytes = 0L,
+                totalBytes = null,
+                fileProgress = null,
+                currentFile = null,
+                currentModelKey = null,
+                currentFileIndex = 0,
+                fileCount = 0,
+                bytesPerSecond = 0L,
+                elapsedSeconds = 0L,
+                estimatedSecondsRemaining = null,
+                errorMessage = null,
+                canStart = false,
+                canCancel = false,
+                isRunning = true,
+                finishedOk = false
+            )
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            var finishedOk = false
+            var activeFileIndex = 0
+            var activeFileStartMs = 0L
+            val progressTicker = launch {
+                while (true) {
+                    delay(1_000L)
+                    val now = System.currentTimeMillis()
+                    _downloadUiState.update {
+                        if (!it.isRunning || activeFileStartMs <= 0L) {
+                            it
+                        } else {
+                            it.copy(
+                                elapsedSeconds = ((now - activeFileStartMs) / 1000L)
+                                    .coerceAtLeast(0L),
+                                estimatedSecondsRemaining = estimatedSecondsRemaining(
+                                    downloadedBytes = it.doneBytes,
+                                    totalBytes = it.totalBytes,
+                                    bytesPerSecond = it.bytesPerSecond
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            try {
+                val result = pipeline.downloadManifestModels { spec, fileIndex, fileCount, downloadedBytes, totalBytes ->
+                    val now = System.currentTimeMillis()
+                    if (activeFileIndex != fileIndex) {
+                        activeFileIndex = fileIndex
+                        activeFileStartMs = now
+                    }
+                    val elapsedMs = (now - activeFileStartMs).coerceAtLeast(0L)
+                    val elapsedSeconds = elapsedMs / 1000L
+                    val bytesPerSecond = if (elapsedMs > 0L && downloadedBytes > 0L) {
+                        (downloadedBytes * 1000L) / elapsedMs
+                    } else {
+                        0L
+                    }
+                    _downloadUiState.update {
+                        it.copy(
+                            done = clampDownloadBytes(downloadedBytes),
+                            total = clampDownloadBytes(totalBytes),
+                            doneBytes = downloadedBytes,
+                            totalBytes = totalBytes,
+                            fileProgress = fileProgress(downloadedBytes, totalBytes),
+                            currentFile = spec.fileName,
+                            currentModelKey = spec.destination,
+                            currentFileIndex = fileIndex,
+                            fileCount = fileCount,
+                            bytesPerSecond = bytesPerSecond,
+                            elapsedSeconds = elapsedSeconds,
+                            estimatedSecondsRemaining = estimatedSecondsRemaining(
+                                downloadedBytes = downloadedBytes,
+                                totalBytes = totalBytes,
+                                bytesPerSecond = bytesPerSecond
+                            ),
+                            errorMessage = null
+                        )
+                    }
+                }
+                if (result.isSuccess) {
+                    reinitializePipelineForChat()
+                    finishedOk = true
+                } else {
+                    Log.e(
+                        VOICE_ASSISTANT_TAG,
+                        "Failed to download app models",
+                        result.exceptionOrNull()
+                    )
+                    _downloadUiState.update {
+                        it.copy(
+                            errorMessage = userFacingDownloadErrorMessage(
+                                result.exceptionOrNull()
+                            )
+                        )
+                    }
+                    updateModelAvailabilityState(pipeline.checkManifestModelsAvailability())
+                }
+            } catch (e: Exception) {
+                Log.e(VOICE_ASSISTANT_TAG, "Failed to download app models", e)
+                _downloadUiState.update {
+                    it.copy(
+                        errorMessage = userFacingDownloadErrorMessage(e)
+                    )
+                }
+                updateModelAvailabilityState(pipeline.checkManifestModelsAvailability())
+            } finally {
+                progressTicker.cancel()
+                _downloadUiState.update {
+                    it.copy(
+                        canStart = true,
+                        canCancel = false,
+                        isRunning = false,
+                        finishedOk = finishedOk
+                    )
+                }
+            }
+        }
     }
 }

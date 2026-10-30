@@ -16,7 +16,7 @@
   * [Application pipeline](#application-pipeline)
     * [Speech to Text Library](#speech-to-text-library)
     * [Large Language Models Library](#large-language-models-library)
-        * [Visual Question Answering (Optional)](#visual-question-answering-optional)
+      * [Visual Question Answering (Optional)](#visual-question-answering-optional)
     * [Text to Speech Component](#text-to-speech-component)
   * [KleidiAI Configuration](#kleidiai-configuration)
   * [LLM Framework](#llm-framework)
@@ -223,6 +223,22 @@ Other versions may work but have not been officially tested.
 ## Known issues
 
 > **NOTE**: The cancellation flow of the application is currently under testing. Further updates and improvements will follow.
+
+### ONNX Runtime GenAI
+
+The following issues have been observed in the Real-Time Voice Assistant application when using the `onnxruntime-genai` backend:
+
+#### Reduced decode performance
+
+Lower-than-expected token generation (decode) performance has been observed, resulting in reduced output throughput and potentially affecting application responsiveness. The root cause is under investigation.
+
+**Tracking:** [MLECO-7894](https://jira.arm.com/browse/MLECO-7894) (Arm internal Jira).
+
+#### Excessive output verbosity and potential hangs
+
+Responses may be excessively verbose and continue until the configured maximum output token limit is reached. RTVA stops generation at this limit, which may truncate the response and, in some cases, cause the application to become unresponsive. The root cause is under investigation.
+
+**Tracking:** [MLECO-7895](https://jira.arm.com/browse/MLECO-7895) (Arm internal Jira).
 
 ## Contributions
 

@@ -25,8 +25,6 @@ import java.util.concurrent.LinkedBlockingQueue
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
-import com.arm.voiceassistant.utils.Constants.SME_ENABLED_THREADS_CONFIG_WARNING
-import com.arm.voiceassistant.utils.CpuFeaturesUtility.hasSME
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.atomic.AtomicReference
 
@@ -239,7 +237,7 @@ object Utils {
         when (framework) {
             "llama.cpp" -> {
                 llmModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q4_0.gguf"
-                llmMmProjModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q8_0_proj.gguf"
+                llmMmProjModelName = "llama.cpp/qwen2vl-2b/qwen2vl-2b-F16_proj.gguf"
                 isVision = true
                 systemTemplate = "<|im_start|>system\n%s<|im_end|>\n"
                 userTemplate =  "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
@@ -276,8 +274,6 @@ object Utils {
         val cores = Runtime.getRuntime().availableProcessors()
         val numThreads = if (cores >= 8) 4 else 2
 
-        ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
-
         return UserLlmConfig(
             ChatConfig(systemPrompt,applyDefaultChatTemplate,systemTemplate,userTemplate),
             ModelConfig(modelPointer,isVision,projPointer),
@@ -285,11 +281,9 @@ object Utils {
             stopWords)
     }
 
-    fun isValidLlmConfig(file: File): Boolean {
+    fun isValidLlmConfig(configText: String): Boolean {
         return try {
-            val content = file.readText()
-            if (content.isBlank()) return false
-            val config = Gson().fromJson(content, UserLlmConfig::class.java)
+            val config = Gson().fromJson(configText, UserLlmConfig::class.java)
             config != null &&
                     config.chat.systemPrompt.isNotBlank() &&
                     config.model.llmModelName.isNotBlank() &&
@@ -311,15 +305,14 @@ object Utils {
 
     /**
      * Read LLM configurations defined by User
-     * @param file The user configuration file to read
+     * @param configText The user configuration
      * @param modelPath The path to the model, included in the resulting config
      * @return An [UserLlmConfig] constructed from the file's contents
      */
-    fun readLlmUserConfig(file: File, modelPath: String): JSONObject? {
+    fun readLlmUserConfig(configText: String, modelPath: String): JSONObject? {
         try {
-            val content = file.readText()
             val gson = Gson()
-            val userLlmConfig: UserLlmConfig = gson.fromJson(content, UserLlmConfig::class.java)
+            val userLlmConfig: UserLlmConfig = gson.fromJson(configText, UserLlmConfig::class.java)
             val configJson = JSONObject(gson.toJson(userLlmConfig))
 
             // Update model paths
@@ -338,10 +331,6 @@ object Utils {
 
             Log.d(VOICE_ASSISTANT_TAG, modelObj.getString("llmModelName"))
 
-            if(hasSME()) {
-                ToastService.showToast(SME_ENABLED_THREADS_CONFIG_WARNING)
-            }
-
             return configJson
         } catch (e: Exception) {
             Log.e(VOICE_ASSISTANT_TAG, "LLM configuration invalid: Exception: $e")
@@ -354,16 +343,13 @@ object Utils {
 
     /**
      * Check if config file is valid
-     * @param file The configuration file to validate
+     * @param configText The configuration file text to validate
      * @return true if the file contains valid and non-empty JSON content, false otherwise
      */
-    fun isValidSttConfig(file: File): Boolean {
+    fun isValidSttConfig(configText: String): Boolean {
         return try {
-            // Read file contents
-            val content = file.readText()
-            if (content.isBlank()) return false
             // Parse into JSON
-            val jsonObject = JSONObject(content)
+            val jsonObject = JSONObject(configText)
             // Example checks: ensure required keys are present and valid.
             // Adjust these checks depending on which fields you consider "required".
             jsonObject.has("printRealtime") &&
@@ -390,13 +376,11 @@ object Utils {
 
      /**
       * Reads a JSON file containing Whisper configuration and returns a WhisperConfig object.
-     * @param file The Whisper configuration file to read
+     * @param configText The Whisper configuration text
      * @return A [WhisperConfig] object parsed from the JSON content
       */
-    fun readSttUserConfig(file: File): WhisperConfig {
-        // Read the file content
-        val content = file.readText()
-        val jsonObject = JSONObject(content)
+    fun readSttUserConfig(configText: String): WhisperConfig {
+        val jsonObject = JSONObject(configText)
         // Extract each field from the JSON, with sensible defaults if missing
         val printRealtime   = jsonObject.optBoolean("printRealtime",   true)
         val printProgress   = jsonObject.optBoolean("printProgress",   false)

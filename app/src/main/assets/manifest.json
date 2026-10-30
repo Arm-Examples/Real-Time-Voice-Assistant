@@ -1,0 +1,138 @@
+{
+  "schema": 2,
+  "_comment": "revision is the immutable Hugging Face commit SHA pin. Runtime resolves each file SHA-256 from Hugging Face metadata for that pinned revision, then verifies downloaded bytes locally.",
+  "models": [
+    {
+      "name": "Qwen2-VL 2B Instruct",
+      "purpose": "Vision language model for the llama.cpp backend",
+      "framework": "llama.cpp",
+      "destination": "llama.cpp/qwen2vl-2b",
+      "repo_id": "bartowski/Qwen2-VL-2B-Instruct-GGUF",
+      "revision": "2160e265f926e84e84dbb1c73e623b5324b23707",
+      "artifacts": [
+        {
+          "path": "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+          "repo_id": "ggml-org/Qwen2-VL-2B-Instruct-GGUF",
+          "revision": "bb307c036e8a1ed7b663bbd0c35b41c4c9294cfd"
+        },
+        {
+          "path": "Qwen2-VL-2B-Instruct-Q4_0.gguf"
+        }
+      ]
+    },
+    {
+      "name": "MNN Qwen2.5 VL",
+      "purpose": "Vision language model for the MNN backend",
+      "framework": "mnn",
+      "destination": "mnn/qwen25vl-3b",
+      "repo_id": "taobao-mnn/Qwen2.5-VL-3B-Instruct-MNN",
+      "revision": "a4622194b3c518139e2cb8099e147e3d71975f7a",
+      "artifacts": [
+        {
+          "path": "config.json",
+          "sha256": "8183da75c6c7bda69a3f637ec1254dc6b3b3e0b6bb3cb9f98b12f8a7b1298815"
+        },
+        {
+          "path": "embeddings_bf16.bin"
+        },
+        {
+          "path": "llm.mnn"
+        },
+        {
+          "path": "llm.mnn.json"
+        },
+        {
+          "path": "llm.mnn.weight"
+        },
+        {
+          "path": "llm_config.json",
+          "sha256": "00492942d0603aa638ec263341359f33feeb400e36ca96d11fe1dde1b9f79e77"
+        },
+        {
+          "path": "tokenizer.txt",
+          "sha256": "b86f1298a0d6a1b2f312946c2f674f883f1d134ccabc79c42dd4c6b5beadf37b"
+        },
+        {
+          "path": "visual.mnn"
+        },
+        {
+          "path": "visual.mnn.weight"
+        }
+      ]
+    },
+    {
+      "name": "Phi-4 mini ONNX GenAI",
+      "purpose": "Text model for the ONNX Runtime GenAI backend",
+      "framework": "onnxruntime-genai",
+      "destination": "onnxruntime-genai/phi-4-mini",
+      "repo_id": "microsoft/Phi-4-mini-instruct-onnx",
+      "revision": "fc04c8f93df696602fd9f300a30d1bf2e3081347",
+      "artifacts": [
+        {
+          "path": "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/genai_config.json"
+        },
+        {
+          "path": "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/model.onnx"
+        },
+        {
+          "path": "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/model.onnx.data"
+        },
+        {
+          "path": "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer.json"
+        },
+        {
+          "path": "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer_config.json"
+        }
+      ]
+    },
+    {
+      "name": "Llama 3.2 1B ExecuTorch",
+      "purpose": "Default text model for the ExecuTorch backend",
+      "framework": "executorch",
+      "destination": "executorch/llama-3.2-1b",
+      "repo_id": "executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET",
+      "revision": "911221e0f49d3354cbd4697a9c09feee25cadec7",
+      "artifacts": [
+        {
+          "path": "Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte",
+          "sha256": "8715cdba9e91f6bede00cc5f2d6b12397b95225da5630c4972a8da03001cda3b"
+        },
+        {
+          "path": "tokenizer.model",
+          "sha256": "82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55"
+        }
+      ]
+    },
+    {
+      "name": "Gemma 4 E2B ExecuTorch",
+      "purpose": "Alternative text model for the ExecuTorch backend",
+      "framework": "executorch",
+      "destination": "executorch/gemma-4-e2b",
+      "repo_id": "Arm/gemma-4-e2b-text-executorch",
+      "revision": "55a83637f736c6c60a77d49b82d6444582957718",
+      "artifacts": [
+        {
+          "path": "gemma4_e2b_text_8da4w_emb4.pte",
+          "sha256": "8e1b784256eea13a0caad42c17fca7fac46f94b830877032cc5d658c11be76cc"
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f"
+        }
+      ]
+    },
+    {
+      "name": "Whisper.cpp base model",
+      "purpose": "Speech-to-text model",
+      "framework": "common",
+      "repo_id": "ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "artifacts": [
+        {
+          "path": "ggml-base.en.bin",
+          "destination": "model.bin"
+        }
+      ]
+    }
+  ]
+}

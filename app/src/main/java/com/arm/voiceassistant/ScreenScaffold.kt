@@ -6,8 +6,10 @@
 
 package com.arm.voiceassistant
 
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +17,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,7 +27,7 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.annotation.VisibleForTesting
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,10 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.arm.voiceassistant.ui.composables.DownloadProgressContent
 import com.arm.voiceassistant.ui.composables.TopBar
 import com.arm.voiceassistant.ui.screens.BenchmarkScreen
 import com.arm.voiceassistant.ui.screens.MainScreen
 import com.arm.voiceassistant.ui.screens.ModeSelectionScreen
+import com.arm.voiceassistant.utils.ModelAvailabilityState
 import com.arm.voiceassistant.viewmodels.MainViewModel
 import com.arm.voiceassistant.viewmodels.ViewModelProvider
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -91,6 +98,8 @@ fun screenScaffold(
     mainViewModel: MainViewModel = viewModel(factory = ViewModelProvider.Factory)
 ): MainViewModel {
     val uiState = mainViewModel.uiState.collectAsState().value
+    val modelAvailabilityUiState by mainViewModel.modelAvailabilityUiState.collectAsState()
+    val downloadUiState by mainViewModel.downloadUiState.collectAsState()
 
     var appMode by remember { mutableStateOf(AppMode.ModeSelection) }
     var previousMode by remember { mutableStateOf(AppMode.ModeSelection) }
@@ -102,7 +111,6 @@ fun screenScaffold(
         }
     }
 
-    // Transition handling using switch/when
     LaunchedEffect(appMode) {
         when (appMode) {
             AppMode.ModeSelection -> {
@@ -123,6 +131,75 @@ fun screenScaffold(
             }
         }
         previousMode = appMode
+    }
+
+    val modelAvailabilityState = modelAvailabilityUiState.state
+    val showModelDownloadPrompt = modelAvailabilityState == ModelAvailabilityState.Checked ||
+        modelAvailabilityState == ModelAvailabilityState.Downloading
+
+    if (
+        appMode == AppMode.ModeSelection &&
+        modelAvailabilityState == ModelAvailabilityState.Unchecked
+    ) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Checking models") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Checking required model files before enabling Chat and Benchmark.")
+                    CircularProgressIndicator()
+                }
+            },
+            confirmButton = {}
+        )
+    } else if (showModelDownloadPrompt) {
+        val errorMessage = modelAvailabilityUiState.errorMessage?.takeIf { it.isNotBlank() }
+        val showAvailabilityError = errorMessage != null &&
+            !downloadUiState.isRunning && downloadUiState.errorMessage.isNullOrBlank()
+        val missingModelNames = modelAvailabilityUiState.missingModelNames
+        val missingModelText = when (missingModelNames.size) {
+            0 -> ""
+            1 -> "\n\nMissing or invalid file:\n- ${missingModelNames.first()}"
+            else -> "\n\nMissing or invalid files (${missingModelNames.size}):\n" +
+                missingModelNames.joinToString("\n") { "- $it" }
+        }
+        val detailText = if (showAvailabilityError) "" else missingModelText
+
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(if (showAvailabilityError) "Unable to check models" else "Models required") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        if (showAvailabilityError) {
+                            errorMessage.orEmpty()
+                        } else {
+                            "Download the required models before using Chat or Benchmark." + detailText
+                        }
+                    )
+                    DownloadProgressContent(ui = downloadUiState)
+                }
+            },
+            confirmButton = {
+                if (!downloadUiState.isRunning) {
+                    TextButton(onClick = mainViewModel::downloadAppModels) {
+                        Text(
+                            if (showAvailabilityError) {
+                                "Try again"
+                            } else if (downloadUiState.errorMessage.isNullOrBlank()) {
+                                "Download models"
+                            } else {
+                                "Retry download"
+                            }
+                        )
+                    }
+                }
+            },
+            dismissButton = {}
+        )
     }
 
     Scaffold(
@@ -161,7 +238,6 @@ fun screenScaffold(
             }
         }
     ) { padding ->
-
         Crossfade(
             targetState = appMode,
             label = "screen_fade"
@@ -169,8 +245,23 @@ fun screenScaffold(
             when (mode) {
                 AppMode.ModeSelection -> ModeSelectionScaffold(
                     padding = padding,
-                    onChatSelected = { appMode = AppMode.Chat },
-                    onBenchmarkSelected = { appMode = AppMode.Benchmark }
+                    modelsAvailable = modelAvailabilityState == ModelAvailabilityState.Available,
+                    onChatSelected = onChatSelected@{
+                        when (modelAvailabilityState) {
+                            ModelAvailabilityState.Available -> appMode = AppMode.Chat
+                            ModelAvailabilityState.Checked -> return@onChatSelected
+                            ModelAvailabilityState.Unchecked,
+                            ModelAvailabilityState.Downloading -> return@onChatSelected
+                        }
+                    },
+                    onBenchmarkSelected = onBenchmarkSelected@{
+                        when (modelAvailabilityState) {
+                            ModelAvailabilityState.Available -> appMode = AppMode.Benchmark
+                            ModelAvailabilityState.Checked -> return@onBenchmarkSelected
+                            ModelAvailabilityState.Unchecked,
+                            ModelAvailabilityState.Downloading -> return@onBenchmarkSelected
+                        }
+                    }
                 )
 
                 AppMode.Chat -> ChatScaffold(
@@ -194,12 +285,14 @@ fun screenScaffold(
  * Renders the Mode Selection UI where the user chooses Chat or Benchmark.
  *
  * @param padding Padding values from the parent [Scaffold]
+ * @param modelsAvailable Whether Chat and Benchmark should be selectable
  * @param onChatSelected Invoked when Chat mode is selected
  * @param onBenchmarkSelected Invoked when Benchmark mode is selected
  */
 @Composable
 private fun ModeSelectionScaffold(
     padding: PaddingValues,
+    modelsAvailable: Boolean,
     onChatSelected: () -> Unit,
     onBenchmarkSelected: () -> Unit
 ) {
@@ -207,6 +300,7 @@ private fun ModeSelectionScaffold(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding),
+        modelsAvailable = modelsAvailable,
         onChatSelected = onChatSelected,
         onBenchmarkSelected = onBenchmarkSelected
     )
@@ -229,7 +323,6 @@ private fun ChatScaffold(
     mainViewModel: MainViewModel,
     snackbarHostState: SnackbarHostState
 ) {
-    // Local to Chat only; gets reset automatically when leaving Chat (composable disposed)
     var chatReady by remember { mutableStateOf(false) }
     val statusMessage by mainViewModel.statusMessage.collectAsState()
 

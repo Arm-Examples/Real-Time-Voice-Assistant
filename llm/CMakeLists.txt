@@ -13,7 +13,7 @@ project(llm-module
 include(FetchContent)
 
 set(LLM_MODULE_GIT_URL "https://github.com/Arm-Examples/LLM-Runner.git")
-set(LLM_MODULE_GIT_SHA "b62866dbb1fa5d022a16c9218d066df2eadf93b5")
+set(LLM_MODULE_GIT_SHA "f093cfca5e32107dfa56f965ca95962b178b11b7")
 set(LLM_MODULE_SRC_DIR "${CMAKE_SOURCE_DIR}/llm-src")
 
 FetchContent_Declare(
@@ -25,8 +25,8 @@ SOURCE_DIR         ${LLM_MODULE_SRC_DIR}
 
 FetchContent_MakeAvailable(llmModule)
 
-# This block of code is required to copy llama.ccp arch variant shared libraries
-# to a known location so that they can be picked up by gradle build
+# This block of code is required to copy llama.ccp arch variant shared
+# libraries to a known location so that they can be picked up by gradle build
 # and packaged with the APK.
 # This approach may be used by other backends in future so there is no check for
 # which backend is being used.

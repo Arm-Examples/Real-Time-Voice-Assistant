@@ -17,7 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.utils.Constants
-import com.arm.voiceassistant.viewmodels.MainUiState
+import com.arm.voiceassistant.utils.MainUiState
 import com.arm.voiceassistant.viewmodels.MainViewModel
 import com.arm.voiceassistant.screenScaffold
 import com.arm.voiceassistant.mocks.NoOpSpeechRecorder

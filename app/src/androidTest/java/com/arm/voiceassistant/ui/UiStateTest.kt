@@ -18,8 +18,8 @@ import com.arm.voiceassistant.ui.theme.VoiceAssistantTheme
 import com.arm.voiceassistant.utils.Constants
 import com.arm.voiceassistant.utils.AppContext
 import com.arm.voiceassistant.utils.ChatMessage
+import com.arm.voiceassistant.utils.MainUiState
 import com.arm.voiceassistant.viewmodels.MainViewModel
-import com.arm.voiceassistant.viewmodels.MainUiState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import org.junit.Rule
 import org.junit.Test

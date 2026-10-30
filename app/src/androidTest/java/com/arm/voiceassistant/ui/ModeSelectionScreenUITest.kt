@@ -6,6 +6,8 @@
 
 package com.arm.voiceassistant.ui
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -30,12 +32,14 @@ class ModeSelectionScreenUITest {
      * Sets the ModeSelectionScreen content.
      */
     private fun setModeSelectionContent(
+        modelsAvailable: Boolean = true,
         onChatSelected: () -> Unit = {},
         onBenchmarkSelected: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             VoiceAssistantTheme {
                 ModeSelectionScreen(
+                    modelsAvailable = modelsAvailable,
                     onChatSelected = onChatSelected,
                     onBenchmarkSelected = onBenchmarkSelected
                 )
@@ -84,5 +88,27 @@ class ModeSelectionScreenUITest {
 
         composeTestRule.onNodeWithText("Benchmark").performClick()
         composeTestRule.runOnIdle { assertTrue(clicked) }
+    }
+
+    /**
+     * Verifies Chat and Benchmark are enabled when required models are available.
+     */
+    @Test
+    fun testChatAndBenchmarkEnabledWhenModelsAvailable() {
+        setModeSelectionContent()
+
+        composeTestRule.onNodeWithText("Chat").assertIsEnabled()
+        composeTestRule.onNodeWithText("Benchmark").assertIsEnabled()
+    }
+
+    /**
+     * Verifies Chat and Benchmark are disabled when required models are unavailable.
+     */
+    @Test
+    fun testChatAndBenchmarkDisabledWhenModelsUnavailable() {
+        setModeSelectionContent(modelsAvailable = false)
+
+        composeTestRule.onNodeWithText("Chat").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Benchmark").assertIsNotEnabled()
     }
 }
